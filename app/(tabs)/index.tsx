@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import React from 'react';
+import { router } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import {
-  Alert,
+  ActivityIndicator,
+  Image,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -10,150 +12,324 @@ import {
   View
 } from 'react-native';
 import { useAuth } from '../../hooks/useAuth';
+import { apiService } from '../../services/apiService';
+
+interface DashboardStats {
+  totalMembers: number;
+  pendingAdhesions: number;
+  validatedAdhesions: number;
+  rejectedAdhesions: number;
+}
+
+interface MemberCardImages {
+  recto: string;
+  verso: string;
+}
 
 export default function DashboardScreen() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
+  const [stats, setStats] = useState<DashboardStats>({
+    totalMembers: 0,
+    pendingAdhesions: 0,
+    validatedAdhesions: 0,
+    rejectedAdhesions: 0,
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [memberCardImages, setMemberCardImages] = useState<MemberCardImages>({ recto: '', verso: '' });
+  const [isLoadingCard, setIsLoadingCard] = useState(true);
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Déconnexion',
-      'Êtes-vous sûr de vouloir vous déconnecter ?',
-      [
-        {
-          text: 'Annuler',
-          style: 'cancel',
-        },
-        {
-          text: 'Déconnexion',
-          style: 'destructive',
-          onPress: logout,
-        },
-      ]
-    );
-  };
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        // Récupérer les statistiques du tableau de bord via l'API
+        const dashboardData = await apiService.getSecretaryDashboard();
+        console.log('Dashboard data:', dashboardData);
+        
+        setStats({
+          totalMembers: dashboardData.donnees.statistiques.membres_approuves,
+          pendingAdhesions: dashboardData.donnees.statistiques.membres_en_attente,
+          validatedAdhesions: dashboardData.donnees.statistiques.membres_approuves,
+          rejectedAdhesions: dashboardData.donnees.statistiques.membres_rejetes,
+        });
+      } catch (error) {
+        console.error('Erreur lors du chargement des statistiques:', error);
+        setError('Erreur lors du chargement des statistiques');
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  const getWelcomeMessage = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Bonjour';
-    if (hour < 18) return 'Bon après-midi';
-    return 'Bonsoir';
-  };
+    loadStats();
+  }, []);
 
-  const getRoleDisplayName = (role: string) => {
-    switch (role) {
-      case 'MEMBRE':
-        return 'Membre';
-      case 'PRESIDENT':
-        return 'Président';
-      case 'SECRETAIRE_GENERALE':
-        return 'Secrétaire Général';
-      default:
-        return role;
+  // Charger les images de la carte de membre depuis userStatus
+  useEffect(() => {
+    const loadMemberCardImages = async () => {
+      if (user?.role === 'MEMBRE') {
+        try {
+          setIsLoadingCard(true);
+          const userStatus = await apiService.getUserStatus();
+          console.log('User status:', userStatus);
+          
+          // Vérifier si les images de la carte sont disponibles
+          if (userStatus?.images?.carte_membre) {
+            setMemberCardImages({
+              recto: userStatus.images.carte_membre.recto || '',
+              verso: userStatus.images.carte_membre.verso || ''
+            });
+          }
+        } catch (error) {
+          console.error('Erreur lors du chargement des images de la carte:', error);
+          setMemberCardImages({ recto: '', verso: '' });
+        } finally {
+          setIsLoadingCard(false);
+        }
+      }
+    };
+
+    loadMemberCardImages();
+  }, [user]);
+
+  const handleCardClick = (route: string) => {
+    if (route === '/membres') {
+      router.push('/(tabs)/membres');
+    } else if (route === '/adhesions') {
+      router.push('/(tabs)/adhesions');
+    } else if (route === '/cartes') {
+      router.push('/(tabs)/cartes');
+    } else if (route === '/codes') {
+      router.push('/(tabs)/codes');
     }
   };
+
+  // Si c'est un membre normal, afficher le dashboard membre
+  if (user?.role === 'MEMBRE') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ScrollView style={styles.scrollView}>
+          <View style={styles.content}>
+            {/* En-tête de bienvenue */}
+            <View style={styles.welcomeSection}>
+              <Text style={styles.welcomeTitle}>
+                Bienvenue à L'Espace Membre
+              </Text>
+              <Text style={styles.welcomeSubtitle}>
+                Association des Gabonais du Congo (AGCO)
+              </Text>
+            </View>
+
+            {/* Carte membre complète avec recto/verso */}
+            <View style={styles.cardSection}>
+              <Text style={styles.sectionTitle}>Ma Carte De Membre</Text>
+              
+              <View style={styles.cardContainer}>
+                {/* Recto */}
+                <View style={styles.cardSide}>
+                  <Text style={styles.cardSideTitle}>RECTO</Text>
+                  {isLoadingCard ? (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator size="large" color="#007AFF" />
+                      <Text style={styles.loadingText}>Chargement De L'Image...</Text>
+                    </View>
+                  ) : memberCardImages.recto ? (
+                    <View style={styles.imageContainer}>
+                      <Image
+                        source={{ uri: memberCardImages.recto }}
+                        style={styles.cardImage}
+                        resizeMode="contain"
+                      />
+                    </View>
+                  ) : (
+                    <View style={styles.noImageContainer}>
+                      <Text style={styles.noImageText}>Image Du Recto Non Disponible</Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Verso */}
+                <View style={styles.cardSide}>
+                  <Text style={styles.cardSideTitle}>VERSO</Text>
+                  {isLoadingCard ? (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator size="large" color="#007AFF" />
+                      <Text style={styles.loadingText}>Chargement De L'Image...</Text>
+                    </View>
+                  ) : memberCardImages.verso ? (
+                    <View style={styles.imageContainer}>
+                      <Image
+                        source={{ uri: memberCardImages.verso }}
+                        style={styles.cardImage}
+                        resizeMode="contain"
+                      />
+                    </View>
+                  ) : (
+                    <View style={styles.noImageContainer}>
+                      <Text style={styles.noImageText}>Image Du Verso Non Disponible</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            </View>
+
+            {/* Actions rapides */}
+            <View style={styles.actionsSection}>
+              <Text style={styles.sectionTitle}>Actions Rapides</Text>
+              
+              <View style={styles.actionsGrid}>
+                <TouchableOpacity
+                  style={styles.actionCard}
+                  onPress={async () => {
+                    try {
+                      const userStatus = await apiService.getUserStatus();
+                      if (userStatus) {
+                        router.push('/membre/mon-adhesion');
+                      }
+                    } catch (error) {
+                      console.error('Erreur lors de la récupération de la carte:', error);
+                    }
+                  }}
+                >
+                  <Ionicons name="person-add-outline" size={48} color="#007AFF" />
+                  <Text style={styles.actionTitle}>Ma fiche D'Adhésion</Text>
+                  <Text style={styles.actionSubtitle}>Consulter Vos Informations</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.actionCard}
+                  onPress={() => router.push('/membre/change-password')}
+                >
+                  <Ionicons name="key-outline" size={48} color="#AF52DE" />
+                  <Text style={styles.actionTitle}>Sécurité du compte</Text>
+                  <Text style={styles.actionSubtitle}>Changer votre mot de passe</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.actionCard}
+                  onPress={() => router.push('/(tabs)/membres')}
+                >
+                  <Ionicons name="card-outline" size={48} color="#34C759" />
+                  <Text style={styles.actionTitle}>Ma carte de membre</Text>
+                  <Text style={styles.actionSubtitle}>Télécharger ma carte de membre</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // Dashboard pour les administrateurs
+  const statCards = [
+    {
+      title: 'Liste Des Membres',
+      value: stats.totalMembers,
+      icon: 'people-outline',
+      color: '#007AFF',
+      route: '/membres',
+    },
+    {
+      title: 'Adhésions En Attente',
+      value: stats.pendingAdhesions,
+      icon: 'time-outline',
+      color: '#FF9500',
+      route: '/adhesions',
+    },
+    {
+      title: 'Adhésions Validées',
+      value: stats.validatedAdhesions,
+      icon: 'checkmark-circle-outline',
+      color: '#34C759',
+      route: '/adhesions',
+    },
+    {
+      title: 'Adhésions Rejetées',
+      value: stats.rejectedAdhesions,
+      icon: 'close-circle-outline',
+      color: '#FF3B30',
+      route: '/adhesions',
+    },
+  ];
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView}>
-        {/* En-tête */}
-        <View style={styles.header}>
-          <View style={styles.headerContent}>
-            <View style={styles.welcomeSection}>
-              <Text style={styles.welcomeText}>
-                {getWelcomeMessage()}, {user?.prenoms} !
-              </Text>
-              <Text style={styles.roleText}>
-                {getRoleDisplayName(user?.role || '')}
-              </Text>
-            </View>
-            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-              <Ionicons name="log-out-outline" size={24} color="#FF3B30" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Statistiques rapides */}
-        <View style={styles.statsContainer}>
-          <Text style={styles.sectionTitle}>Aperçu</Text>
+        <View style={styles.content}>
+          <Text style={styles.mainTitle}>Tableau De Bord</Text>
+          
+          {/* Cartes de statistiques */}
           <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
-              <Ionicons name="people-outline" size={32} color="#007AFF" />
-              <Text style={styles.statNumber}>0</Text>
-              <Text style={styles.statLabel}>Membres</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Ionicons name="person-add-outline" size={32} color="#34C759" />
-              <Text style={styles.statNumber}>0</Text>
-              <Text style={styles.statLabel}>Nouvelles adhésions</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Ionicons name="document-outline" size={32} color="#FF9500" />
-              <Text style={styles.statNumber}>0</Text>
-              <Text style={styles.statLabel}>Documents</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Ionicons name="card-outline" size={32} color="#AF52DE" />
-              <Text style={styles.statNumber}>0</Text>
-              <Text style={styles.statLabel}>Cartes membres</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Actions rapides */}
-        <View style={styles.actionsContainer}>
-          <Text style={styles.sectionTitle}>Actions rapides</Text>
-          <View style={styles.actionsGrid}>
-            <TouchableOpacity style={styles.actionCard}>
-              <Ionicons name="people-outline" size={24} color="#007AFF" />
-              <Text style={styles.actionText}>Voir les membres</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionCard}>
-              <Ionicons name="person-add-outline" size={24} color="#34C759" />
-              <Text style={styles.actionText}>Nouvelle adhésion</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionCard}>
-              <Ionicons name="document-outline" size={24} color="#FF9500" />
-              <Text style={styles.actionText}>Documents</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionCard}>
-              <Ionicons name="settings-outline" size={24} color="#8E8E93" />
-              <Text style={styles.actionText}>Paramètres</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Informations utilisateur */}
-        <View style={styles.userInfoContainer}>
-          <Text style={styles.sectionTitle}>Mes informations</Text>
-          <View style={styles.userInfoCard}>
-            <View style={styles.userInfoRow}>
-              <Ionicons name="person-outline" size={20} color="#8E8E93" />
-              <Text style={styles.userInfoLabel}>Nom complet :</Text>
-              <Text style={styles.userInfoValue}>
-                {user?.prenoms} {user?.nom}
-              </Text>
-            </View>
-            <View style={styles.userInfoRow}>
-              <Ionicons name="at-outline" size={20} color="#8E8E93" />
-              <Text style={styles.userInfoLabel}>Nom d'utilisateur :</Text>
-              <Text style={styles.userInfoValue}>{user?.nom_utilisateur}</Text>
-            </View>
-            <View style={styles.userInfoRow}>
-              <Ionicons name="shield-outline" size={20} color="#8E8E93" />
-              <Text style={styles.userInfoLabel}>Rôle :</Text>
-              <Text style={styles.userInfoValue}>
-                {getRoleDisplayName(user?.role || '')}
-              </Text>
-            </View>
-            {user?.a_soumis_formulaire && (
-              <View style={styles.userInfoRow}>
-                <Ionicons name="checkmark-circle-outline" size={20} color="#34C759" />
-                <Text style={styles.userInfoLabel}>Statut :</Text>
-                <Text style={[styles.userInfoValue, styles.statusActive]}>
-                  Adhésion soumise
-                </Text>
+            {isLoading ? (
+              // Affichage du chargement
+              Array.from({ length: 4 }).map((_, index) => (
+                <View key={index} style={styles.loadingCard}>
+                  <View style={styles.loadingIcon} />
+                  <View style={styles.loadingValue} />
+                  <View style={styles.loadingTitle} />
+                </View>
+              ))
+            ) : error ? (
+              // Affichage de l'erreur
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{error}</Text>
+                <TouchableOpacity style={styles.retryButton}>
+                  <Text style={styles.retryButtonText}>Réessayer</Text>
+                </TouchableOpacity>
               </View>
+            ) : (
+              // Affichage des cartes avec les données
+              statCards.map((card, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.statCard}
+                  onPress={() => handleCardClick(card.route)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name={card.icon as any} size={40} color={card.color} />
+                  <Text style={[styles.statValue, { color: card.color }]}>
+                    {card.value}
+                  </Text>
+                  <Text style={styles.statTitle}>{card.title}</Text>
+                </TouchableOpacity>
+              ))
             )}
+          </View>
+
+          {/* Actions rapides */}
+          <View style={styles.actionsSection}>
+            <Text style={styles.sectionTitle}>Actions Rapides</Text>
+            <View style={styles.actionsGrid}>
+              <TouchableOpacity
+                style={styles.actionCard}
+                onPress={() => router.push('/(tabs)/adhesions')}
+              >
+                <Text style={styles.actionTitle}>Liste Des Adhésions</Text>
+                <Text style={styles.actionSubtitle}>Gérer Les Demandes d'Adhésion</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.actionCard}
+                onPress={() => router.push('/(tabs)/cartes')}
+              >
+                <Text style={styles.actionTitle}>Cartes Des Membres</Text>
+                <Text style={styles.actionSubtitle}>Voir Et Télécharger Les Cartes De Membres</Text>
+              </TouchableOpacity>
+              
+              {/* Seulement le secrétaire général voit le lien "Code d'accès" */}
+              {user?.role === 'SECRETAIRE_GENERALE' && (
+                <TouchableOpacity
+                  style={styles.actionCard}
+                  onPress={() => router.push('/(tabs)/codes')}
+                >
+                  <Text style={styles.actionTitle}>Code D'Accès</Text>
+                  <Text style={styles.actionSubtitle}>Gérer Les Codes d'accès</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -169,76 +345,186 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  header: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
+  content: {
+    padding: 20,
   },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  mainTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 24,
+    textAlign: 'center',
   },
   welcomeSection: {
-    flex: 1,
+    alignItems: 'center',
+    marginBottom: 32,
   },
-  welcomeText: {
+  welcomeTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 4,
+    color: '#007AFF',
+    marginBottom: 8,
+    textAlign: 'center',
   },
-  roleText: {
+  welcomeSubtitle: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
-  },
-  logoutButton: {
-    padding: 8,
-  },
-  statsContainer: {
-    padding: 20,
+    color: '#666',
+    textAlign: 'center',
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 16,
+    textAlign: 'center',
+  },
+  cardSection: {
+    marginBottom: 32,
+  },
+  cardContainer: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  cardSide: {
+    marginBottom: 16,
+  },
+  cardSideTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#007AFF',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 8,
+  },
+  imageContainer: {
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  cardImage: {
+    width: '100%',
+    height: 200,
+  },
+  noImageContainer: {
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    borderStyle: 'dashed',
+    borderRadius: 8,
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 120,
+  },
+  noImageText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    marginBottom: 32,
   },
   statCard: {
     backgroundColor: 'white',
     borderRadius: 12,
-    padding: 16,
-    width: '48%',
+    padding: 20,
     alignItems: 'center',
-    marginBottom: 12,
+    width: '48%',
+    marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
     elevation: 5,
   },
-  statNumber: {
-    fontSize: 24,
+  statValue: {
+    fontSize: 32,
     fontWeight: 'bold',
-    color: '#333',
     marginTop: 8,
+    marginBottom: 4,
   },
-  statLabel: {
+  statTitle: {
     fontSize: 12,
     color: '#666',
-    marginTop: 4,
     textAlign: 'center',
   },
-  actionsContainer: {
+  loadingCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
     padding: 20,
+    alignItems: 'center',
+    width: '48%',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  loadingIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E0E0E0',
+    marginBottom: 8,
+  },
+  loadingValue: {
+    width: 60,
+    height: 24,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 4,
+    marginBottom: 4,
+  },
+  loadingTitle: {
+    width: 80,
+    height: 16,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 4,
+  },
+  errorContainer: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 16,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#FF3B30',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  retryButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  actionsSection: {
+    marginBottom: 32,
   },
   actionsGrid: {
     flexDirection: 'row',
@@ -248,62 +534,27 @@ const styles = StyleSheet.create({
   actionCard: {
     backgroundColor: 'white',
     borderRadius: 12,
-    padding: 16,
-    width: '48%',
-    alignItems: 'center',
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  actionText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  userInfoContainer: {
     padding: 20,
-    paddingBottom: 40,
-  },
-  userInfoCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
+    alignItems: 'center',
+    width: '48%',
+    marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
     elevation: 5,
   },
-  userInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  userInfoLabel: {
+  actionTitle: {
     fontSize: 14,
-    color: '#666',
-    marginLeft: 8,
-    flex: 1,
-  },
-  userInfoValue: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: '#333',
+    textAlign: 'center',
+    marginTop: 12,
+    marginBottom: 4,
   },
-  statusActive: {
-    color: '#34C759',
+  actionSubtitle: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
   },
 });

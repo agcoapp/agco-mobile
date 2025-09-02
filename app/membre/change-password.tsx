@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import React from 'react';
+import { router } from 'expo-router';
+import React, { useEffect } from 'react';
 import {
     Alert,
     SafeAreaView,
@@ -9,8 +10,48 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function ChangePasswordScreen() {
+  const { user } = useAuth();
+
+  // Protection de rôle - rediriger si pas MEMBRE
+  useEffect(() => {
+    if (user?.role !== 'MEMBRE') {
+      Alert.alert(
+        'Accès refusé',
+        'Cette page est réservée aux membres uniquement.',
+        [
+          {
+            text: 'OK',
+            onPress: () => router.back(),
+          },
+        ]
+      );
+    }
+  }, [user?.role]);
+
+  // Si pas MEMBRE, ne pas afficher le contenu
+  if (user?.role !== 'MEMBRE') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Ionicons name="warning-outline" size={64} color="#FF3B30" />
+          <Text style={styles.errorTitle}>Accès refusé</Text>
+          <Text style={styles.errorText}>
+            Cette page est réservée aux membres uniquement.
+          </Text>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backButtonText}>Retour</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView}>
@@ -85,6 +126,36 @@ const styles = StyleSheet.create({
   content: {
     padding: 20,
     alignItems: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FF3B30',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  backButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  backButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
   iconContainer: {
     marginBottom: 20,
