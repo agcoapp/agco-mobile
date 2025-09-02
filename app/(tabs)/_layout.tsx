@@ -139,7 +139,7 @@ export default function TabLayout() {
         <Drawer.Screen
           key="settings"
           name="settings"
-          options={{
+        options={{
             title: 'Signature du Président',
             drawerIcon: ({ color, size }: { color: string; size: number }) => (
               <Ionicons name="create-outline" size={size} color={color} />

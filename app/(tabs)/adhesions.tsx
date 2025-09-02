@@ -142,9 +142,7 @@ export default function AdhesionsScreen() {
         if (!a || typeof a !== 'object') return false;
         return a.statut === status;
       });
-      
-      console.log(`🔍 ${filteredByStatus.length} adhésions trouvées pour le statut: ${status}`);
-      
+            
       if (!searchTerm || searchTerm.trim() === '') {
         return filteredByStatus;
       }
@@ -352,7 +350,7 @@ export default function AdhesionsScreen() {
         <View style={styles.adhesionActions}>
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => router.push('/(tabs)/membres')}
+            onPress={() => router.push(`/adhesion/${item.id}` as any)}
             disabled={actionLoading === item.id}
           >
             <Ionicons name="eye-outline" size={20} color="#007AFF" />
