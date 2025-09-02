@@ -1,5 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as FileSystem from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
 import { router, useLocalSearchParams } from 'expo-router';
+import * as Sharing from 'expo-sharing';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -10,7 +13,7 @@ import {
     StyleSheet,
     Text,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 import { useAuth } from '../../hooks/useAuth';
 import { apiService } from '../../services/apiService';
@@ -129,29 +132,108 @@ export default function AdhesionDetailsScreen() {
       return;
     }
 
+    Alert.alert(
+      'Choisir le format',
+      'Comment souhaitez-vous télécharger la fiche d\'adhésion ?',
+      [
+        {
+          text: 'PNG (Galerie)',
+          onPress: () => downloadAsPNG()
+        },
+        {
+          text: 'PDF (Fichiers)',
+          onPress: () => downloadAsPDF()
+        },
+        {
+          text: 'Annuler',
+          style: 'cancel'
+        }
+      ]
+    );
+  };
+
+  const downloadAsPNG = async () => {
     try {
-      // Pour React Native, on peut ouvrir l'image dans le navigateur ou la partager
-      Alert.alert(
-        'Téléchargement',
-        'L\'image du formulaire sera ouverte dans votre navigateur pour téléchargement.',
-        [
-          {
-            text: 'Annuler',
-            style: 'cancel'
-          },
-          {
-            text: 'Ouvrir',
-            onPress: () => {
-              // Ici vous pourriez utiliser Linking.openURL pour ouvrir l'image
-              // ou implémenter un système de partage
-              console.log('Ouverture de l\'image:', adhesion.formulaireImage);
-            }
-          }
-        ]
+      // Demander la permission d'accéder à la galerie
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert('Permission refusée', 'Permission d\'accès à la galerie refusée');
+        return;
+      }
+
+      // Créer un nom de fichier unique
+      const fileName = `fiche_adhesion_${adhesion?.nom_complet || 'membre'}_${Date.now()}.png`;
+      const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+
+      // Télécharger l'image
+      const downloadResult = await FileSystem.downloadAsync(
+        adhesion!.formulaireImage,
+        fileUri
       );
+
+      if (downloadResult.status === 200) {
+        // Sauvegarder dans la galerie
+        const asset = await MediaLibrary.createAssetAsync(fileUri);
+        await MediaLibrary.createAlbumAsync('SGM', asset, false);
+        
+        Alert.alert(
+          'Succès',
+          'Image téléchargée avec succès dans votre galerie !',
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert('Erreur', 'Échec du téléchargement de l\'image');
+      }
     } catch (error) {
-      console.error('Erreur lors du téléchargement:', error);
-      Alert.alert('Erreur', 'Erreur lors du téléchargement');
+      console.error('Erreur lors du téléchargement PNG:', error);
+      Alert.alert(
+        'Erreur',
+        'Erreur lors du téléchargement de l\'image. Veuillez réessayer.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
+  const downloadAsPDF = async () => {
+    try {
+      // Créer un nom de fichier unique
+      const fileName = `fiche_adhesion_${adhesion?.nom_complet || 'membre'}_${Date.now()}.pdf`;
+      const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+
+      // Télécharger l'image (nous la traitons comme un PDF)
+      const downloadResult = await FileSystem.downloadAsync(
+        adhesion!.formulaireImage,
+        fileUri
+      );
+
+      if (downloadResult.status === 200) {
+        // Vérifier si le partage est disponible
+        const isAvailable = await Sharing.isAvailableAsync();
+        
+        if (isAvailable) {
+          // Partager le fichier
+          await Sharing.shareAsync(fileUri, {
+            mimeType: 'application/pdf',
+            dialogTitle: 'Fiche d\'adhésion'
+          });
+        } else {
+          Alert.alert(
+            'Succès',
+            `Fichier PDF téléchargé avec succès !\nFichier: ${fileName}`,
+            [{ text: 'OK' }]
+          );
+        }
+      } else {
+        Alert.alert('Erreur', 'Échec du téléchargement du fichier PDF');
+      }
+    } catch (error) {
+      console.error('Erreur lors du téléchargement PDF:', error);
+      Alert.alert(
+        'Erreur',
+        'Erreur lors du téléchargement du fichier PDF. Veuillez réessayer.',
+        [{ text: 'OK' }]
+      );
     }
   };
 
@@ -200,6 +282,7 @@ export default function AdhesionDetailsScreen() {
               <Ionicons name="download-outline" size={24} color="white" />
               <Text style={styles.downloadButtonText}>Télécharger la fiche d'adhésion</Text>
             </TouchableOpacity>
+            
           )}
         </View>
 
