@@ -1,75 +1,309 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import React from 'react';
+import {
+  Alert,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import { useAuth } from '../../hooks/useAuth';
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+export default function DashboardScreen() {
+  const { user, logout } = useAuth();
 
-export default function HomeScreen() {
+  const handleLogout = () => {
+    Alert.alert(
+      'Déconnexion',
+      'Êtes-vous sûr de vouloir vous déconnecter ?',
+      [
+        {
+          text: 'Annuler',
+          style: 'cancel',
+        },
+        {
+          text: 'Déconnexion',
+          style: 'destructive',
+          onPress: logout,
+        },
+      ]
+    );
+  };
+
+  const getWelcomeMessage = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Bonjour';
+    if (hour < 18) return 'Bon après-midi';
+    return 'Bonsoir';
+  };
+
+  const getRoleDisplayName = (role: string) => {
+    switch (role) {
+      case 'MEMBRE':
+        return 'Membre';
+      case 'PRESIDENT':
+        return 'Président';
+      case 'SECRETAIRE_GENERALE':
+        return 'Secrétaire Général';
+      default:
+        return role;
+    }
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <SafeAreaView style={styles.container}>
+      <ScrollView style={styles.scrollView}>
+        {/* En-tête */}
+        <View style={styles.header}>
+          <View style={styles.headerContent}>
+            <View style={styles.welcomeSection}>
+              <Text style={styles.welcomeText}>
+                {getWelcomeMessage()}, {user?.prenoms} !
+              </Text>
+              <Text style={styles.roleText}>
+                {getRoleDisplayName(user?.role || '')}
+              </Text>
+            </View>
+            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+              <Ionicons name="log-out-outline" size={24} color="#FF3B30" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Statistiques rapides */}
+        <View style={styles.statsContainer}>
+          <Text style={styles.sectionTitle}>Aperçu</Text>
+          <View style={styles.statsGrid}>
+            <View style={styles.statCard}>
+              <Ionicons name="people-outline" size={32} color="#007AFF" />
+              <Text style={styles.statNumber}>0</Text>
+              <Text style={styles.statLabel}>Membres</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Ionicons name="person-add-outline" size={32} color="#34C759" />
+              <Text style={styles.statNumber}>0</Text>
+              <Text style={styles.statLabel}>Nouvelles adhésions</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Ionicons name="document-outline" size={32} color="#FF9500" />
+              <Text style={styles.statNumber}>0</Text>
+              <Text style={styles.statLabel}>Documents</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Ionicons name="card-outline" size={32} color="#AF52DE" />
+              <Text style={styles.statNumber}>0</Text>
+              <Text style={styles.statLabel}>Cartes membres</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Actions rapides */}
+        <View style={styles.actionsContainer}>
+          <Text style={styles.sectionTitle}>Actions rapides</Text>
+          <View style={styles.actionsGrid}>
+            <TouchableOpacity style={styles.actionCard}>
+              <Ionicons name="people-outline" size={24} color="#007AFF" />
+              <Text style={styles.actionText}>Voir les membres</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionCard}>
+              <Ionicons name="person-add-outline" size={24} color="#34C759" />
+              <Text style={styles.actionText}>Nouvelle adhésion</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionCard}>
+              <Ionicons name="document-outline" size={24} color="#FF9500" />
+              <Text style={styles.actionText}>Documents</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionCard}>
+              <Ionicons name="settings-outline" size={24} color="#8E8E93" />
+              <Text style={styles.actionText}>Paramètres</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Informations utilisateur */}
+        <View style={styles.userInfoContainer}>
+          <Text style={styles.sectionTitle}>Mes informations</Text>
+          <View style={styles.userInfoCard}>
+            <View style={styles.userInfoRow}>
+              <Ionicons name="person-outline" size={20} color="#8E8E93" />
+              <Text style={styles.userInfoLabel}>Nom complet :</Text>
+              <Text style={styles.userInfoValue}>
+                {user?.prenoms} {user?.nom}
+              </Text>
+            </View>
+            <View style={styles.userInfoRow}>
+              <Ionicons name="at-outline" size={20} color="#8E8E93" />
+              <Text style={styles.userInfoLabel}>Nom d'utilisateur :</Text>
+              <Text style={styles.userInfoValue}>{user?.nom_utilisateur}</Text>
+            </View>
+            <View style={styles.userInfoRow}>
+              <Ionicons name="shield-outline" size={20} color="#8E8E93" />
+              <Text style={styles.userInfoLabel}>Rôle :</Text>
+              <Text style={styles.userInfoValue}>
+                {getRoleDisplayName(user?.role || '')}
+              </Text>
+            </View>
+            {user?.a_soumis_formulaire && (
+              <View style={styles.userInfoRow}>
+                <Ionicons name="checkmark-circle-outline" size={20} color="#34C759" />
+                <Text style={styles.userInfoLabel}>Statut :</Text>
+                <Text style={[styles.userInfoValue, styles.statusActive]}>
+                  Adhésion soumise
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  container: {
+    flex: 1,
+    backgroundColor: '#F5F5F5',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  header: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  welcomeSection: {
+    flex: 1,
+  },
+  welcomeText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 4,
+  },
+  roleText: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  logoutButton: {
+    padding: 8,
+  },
+  statsContainer: {
+    padding: 20,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 16,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  statCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    width: '48%',
+    alignItems: 'center',
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  statNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 8,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  actionsContainer: {
+    padding: 20,
+  },
+  actionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  actionCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    width: '48%',
+    alignItems: 'center',
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  actionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  userInfoContainer: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  userInfoCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  userInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  userInfoLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 8,
+    flex: 1,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  userInfoValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  statusActive: {
+    color: '#34C759',
   },
 });

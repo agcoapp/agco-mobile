@@ -1,45 +1,138 @@
-import { Tabs } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { Drawer } from 'expo-router/drawer';
 import React from 'react';
-import { Platform } from 'react-native';
-
-import { HapticTab } from '@/components/HapticTab';
-import { IconSymbol } from '@/components/ui/IconSymbol';
-import TabBarBackground from '@/components/ui/TabBarBackground';
-import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const { user } = useAuth();
+
+  const getRoleDisplayName = (role: string) => {
+    switch (role) {
+      case 'MEMBRE':
+        return 'Membre';
+      case 'PRESIDENT':
+        return 'Président';
+      case 'SECRETAIRE_GENERALE':
+        return 'Secrétaire Général';
+      default:
+        return role;
+    }
+  };
 
   return (
-    <Tabs
+    <Drawer
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false,
-        tabBarButton: HapticTab,
-        tabBarBackground: TabBarBackground,
-        tabBarStyle: Platform.select({
-          ios: {
-            // Use a transparent background on iOS to show the blur effect
-            position: 'absolute',
-          },
-          default: {},
-        }),
-      }}>
-      <Tabs.Screen
+        headerStyle: {
+          backgroundColor: '#007AFF',
+        },
+        headerTintColor: '#fff',
+        headerTitleStyle: {
+          fontWeight: 'bold',
+        },
+        drawerActiveTintColor: '#007AFF',
+        drawerInactiveTintColor: '#666',
+        drawerStyle: {
+          backgroundColor: '#F5F5F5',
+        },
+        drawerLabelStyle: {
+          fontWeight: '600',
+        },
+      }}
+    >
+      <Drawer.Screen
         name="index"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          title: 'Dashboard',
+          drawerIcon: ({ color, size }: { color: string; size: number }) => (
+            <Ionicons name="grid-outline" size={size} color={color} />
+          ),
         }}
       />
-      <Tabs.Screen
-        name="explore"
+      <Drawer.Screen
+        name="membres"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: 'Membres',
+          drawerIcon: ({ color, size }: { color: string; size: number }) => (
+            <Ionicons name="people-outline" size={size} color={color} />
+          ),
         }}
       />
-    </Tabs>
+      <Drawer.Screen
+        name="adhesions"
+        options={{
+          title: 'Adhésions',
+          drawerIcon: ({ color, size }: { color: string; size: number }) => (
+            <Ionicons name="person-add-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Drawer.Screen
+        name="documents"
+        options={{
+          title: 'Documents',
+          drawerIcon: ({ color, size }: { color: string; size: number }) => (
+            <Ionicons name="document-text-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      
+      {/* Pages supplémentaires selon le rôle */}
+      {user?.role === 'MEMBRE' && (
+        <>
+          <Drawer.Screen
+            name="mon-adhesion"
+            options={{
+              title: 'Ma fiche d\'adhésion',
+              drawerIcon: ({ color, size }: { color: string; size: number }) => (
+                <Ionicons name="person-outline" size={size} color={color} />
+              ),
+            }}
+          />
+          <Drawer.Screen
+            name="change-password"
+            options={{
+              title: 'Changer mot de passe',
+              drawerIcon: ({ color, size }: { color: string; size: number }) => (
+                <Ionicons name="key-outline" size={size} color={color} />
+              ),
+            }}
+          />
+        </>
+      )}
+      
+      {(user?.role === 'PRESIDENT' || user?.role === 'SECRETAIRE_GENERALE') && (
+        <>
+          <Drawer.Screen
+            name="cartes"
+            options={{
+              title: 'Cartes de membres',
+              drawerIcon: ({ color, size }: { color: string; size: number }) => (
+                <Ionicons name="card-outline" size={size} color={color} />
+              ),
+            }}
+          />
+          {user?.role === 'SECRETAIRE_GENERALE' && (
+            <Drawer.Screen
+              name="codes"
+              options={{
+                title: 'Codes d\'accès',
+                drawerIcon: ({ color, size }: { color: string; size: number }) => (
+                  <Ionicons name="key-outline" size={size} color={color} />
+                ),
+              }}
+            />
+          )}
+          <Drawer.Screen
+            name="settings"
+            options={{
+              title: 'Signature du Président',
+              drawerIcon: ({ color, size }: { color: string; size: number }) => (
+                <Ionicons name="create-outline" size={size} color={color} />
+              ),
+            }}
+          />
+        </>
+      )}
+    </Drawer>
   );
 }
