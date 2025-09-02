@@ -1,9 +1,9 @@
-// Service API pour remplacer complètement le localStorage
+// Service API pour React Native avec AsyncStorage
 // Basé sur l'API SGM Backend documentée
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios, { AxiosError, AxiosInstance } from 'axios';
 
-import axios, { AxiosInstance, AxiosResponse, AxiosError } from 'axios';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_BASE_URL = "https://sgm-backend-production.up.railway.app";
 
 export interface User {
   id: number;
@@ -555,19 +555,17 @@ class ApiService {
   }
 
   // Gestion du token
-  setToken(token: string) {
+  async setToken(token: string) {
     this.token = token;
     // Mettre à jour le header d'autorisation dans l'instance axios
     this.axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('sgm_token', token);
-    }
+    await AsyncStorage.setItem('sgm_token', token);
   }
 
-  getToken(): string | null {
-    if (!this.token && typeof window !== 'undefined') {
-      this.token = localStorage.getItem('sgm_token');
-      // Mettre à jour le header si on récupère le token depuis localStorage
+  async getToken(): Promise<string | null> {
+    if (!this.token) {
+      this.token = await AsyncStorage.getItem('sgm_token');
+      // Mettre à jour le header si on récupère le token depuis AsyncStorage
       if (this.token) {
         this.axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${this.token}`;
       }
@@ -575,19 +573,17 @@ class ApiService {
     return this.token;
   }
 
-  clearToken() {
+  async clearToken() {
     this.token = null;
     // Supprimer le header d'autorisation de l'instance axios
     delete this.axiosInstance.defaults.headers.common['Authorization'];
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('sgm_token');
-    }
+    await AsyncStorage.removeItem('sgm_token');
   }
 
   // Méthodes d'authentification
   async login(credentials: LoginRequest): Promise<LoginResponse> {
     const response = await this.axiosInstance.post(`/api/auth/connexion`, credentials);
-    this.setToken(response.data.token);
+    await this.setToken(response.data.token);
     return response.data;
   }
 
@@ -595,13 +591,12 @@ class ApiService {
     try {
       if (this.token) {
         await this.axiosInstance.post(`/api/auth/deconnexion`);
-        localStorage.removeItem('sgm_user');
-        localStorage.removeItem('sgm_token');
+        await AsyncStorage.multiRemove(['sgm_user', 'sgm_token']);
       }
     } catch (error) {
       console.warn('Erreur lors de la déconnexion:', error);
     } finally {
-      this.clearToken();
+      await this.clearToken();
     }
   }
 
