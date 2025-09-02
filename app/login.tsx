@@ -15,7 +15,7 @@ import LoginForm from '../components/forms/LoginForm';
 export default function LoginScreen() {
   const handleLoginSuccess = () => {
     // La connexion a réussi et l'utilisateur peut accéder au dashboard
-    router.push('/(tabs)');
+    router.replace('/(tabs)');
   };
 
   const handleRedirect = (path: string, message: string, rejectionReason?: string) => {
@@ -27,13 +27,13 @@ export default function LoginScreen() {
     
     if (path === '/register') {
       // Rediriger vers l'écran d'inscription (temporairement vers tabs)
-      router.push('/(tabs)');
+      router.replace('/(tabs)');
     } else if (path === '/(tabs)') {
       // Rediriger vers le dashboard
-      router.push('/(tabs)');
+      router.replace('/(tabs)');
     } else {
       // Redirection par défaut
-      router.push('/(tabs)');
+      router.replace('/(tabs)');
     }
   };
 

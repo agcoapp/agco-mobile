@@ -202,12 +202,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await apiService.logout();
       setUser(null);
       await AsyncStorage.multiRemove(['sgm_user', 'sgm_token']);
-      router.push('/(tabs)');
+      router.replace('/login');
     } catch (error) {
       console.error('Erreur lors de la déconnexion:', error);
       setUser(null);
       await AsyncStorage.multiRemove(['sgm_user', 'sgm_token']);
-      router.push('/(tabs)');
+      router.replace('/login');
     }
   };
 
