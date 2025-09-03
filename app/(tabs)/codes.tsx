@@ -5,8 +5,11 @@ import {
   ActivityIndicator,
   Clipboard,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -150,10 +153,11 @@ export default function CodesScreen() {
     }
   };
 
-  const copyToClipboard = async (text: string, type: 'username' | 'code') => {
+  const copyToClipboard = async (item: UtilisateurCredentials) => {
     try {
-      await Clipboard.setString(text);
-      setToastMessage(`${type === 'username' ? 'Username' : 'Code d\'accès'} copié dans le presse-papier`);
+      const credentialsText = `𝗡𝗼𝗺 𝗱'𝘂𝘁𝗶𝗹𝗶𝘀𝗮𝘁𝗲𝘂𝗿: ${item.nom_utilisateur}\n𝗖𝗼𝗱𝗲 𝗱'𝗮𝗰𝗰𝗲̀𝘀: ${item.mot_passe_temporaire}\nLien de connexion: https://agco-psi.vercel.app?code=${item.mot_passe_temporaire}&username=${item.nom_utilisateur}`;
+      await Clipboard.setString(credentialsText);
+      setToastMessage('Identifiants et lien copiés dans le presse-papier');
       setToastType('success');
       setShowToast(true);
     } catch (error) {
@@ -279,11 +283,12 @@ export default function CodesScreen() {
               />
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => copyToClipboard(item.mot_passe_temporaire, 'code')}
-            >
-              <Ionicons name="copy-outline" size={20} color="#007AFF" />
-            </TouchableOpacity>
+               style={styles.actionButton}
+               onPress={() => copyToClipboard(item)}
+             >
+               <Ionicons name="copy-outline" size={20} color="#007AFF" />
+               <Text style={styles.copyButtonText}>Copier tout</Text>
+             </TouchableOpacity>
           </View>
         </View>
         
@@ -291,15 +296,9 @@ export default function CodesScreen() {
           {passwordVisibility[item.id.toString()] ? item.mot_passe_temporaire : '••••••••••••'}
         </Text>
 
-        <View style={styles.codeHeader}>
-          <Text style={styles.codeTitle}>Username</Text>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => copyToClipboard(item.nom_utilisateur, 'username')}
-          >
-            <Ionicons name="copy-outline" size={20} color="#007AFF" />
-          </TouchableOpacity>
-        </View>
+                 <View style={styles.codeHeader}>
+           <Text style={styles.codeTitle}>Username</Text>
+         </View>
         
         <Text style={styles.usernameValue}>{item.nom_utilisateur}</Text>
 
@@ -372,59 +371,71 @@ export default function CodesScreen() {
         transparent={true}
         onRequestClose={() => !isCreatingCode && setShowCreateModal(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Créer un nouveau code d'accès</Text>
-            
-            <TextInput
-              style={styles.input}
-              placeholder="Prénom"
-              placeholderTextColor="#999"
-              value={firstName}
-              onChangeText={setFirstName}
-              editable={!isCreatingCode}
-            />
-            
-            <TextInput
-              style={styles.input}
-              placeholder="Nom de famille"
-              placeholderTextColor="#999"
-              value={lastName}
-              onChangeText={setLastName}
-              editable={!isCreatingCode}
-            />
-
-            <View style={styles.infoAlert}>
-              <Ionicons name="information-circle-outline" size={20} color="#007AFF" />
-              <Text style={styles.infoText}>
-                Le système va créer automatiquement un nom d'utilisateur et un mot de passe temporaire.
-                Le membre devra changer ce mot de passe lors de sa première connexion.
-              </Text>
-            </View>
-            
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setShowCreateModal(false)}
-                disabled={isCreatingCode}
-              >
-                <Text style={styles.cancelButtonText}>Annuler</Text>
-              </TouchableOpacity>
+        <KeyboardAvoidingView 
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <ScrollView 
+            contentContainerStyle={styles.modalScrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Créer un nouveau code d'accès</Text>
               
-              <TouchableOpacity
-                style={[styles.modalButton, styles.confirmButton]}
-                onPress={handleCreateCode}
-                disabled={isCreatingCode}
-              >
-                {isCreatingCode ? (
-                  <ActivityIndicator size="small" color="white" />
-                ) : (
-                  <Text style={styles.confirmButtonText}>Créer</Text>
-                )}
-              </TouchableOpacity>
+              <TextInput
+                style={styles.input}
+                placeholder="Prénom"
+                placeholderTextColor="#999"
+                value={firstName}
+                onChangeText={setFirstName}
+                editable={!isCreatingCode}
+                returnKeyType="next"
+              />
+              
+              <TextInput
+                style={styles.input}
+                placeholder="Nom de famille"
+                placeholderTextColor="#999"
+                value={lastName}
+                onChangeText={setLastName}
+                editable={!isCreatingCode}
+                returnKeyType="done"
+                onSubmitEditing={handleCreateCode}
+              />
+
+              <View style={styles.infoAlert}>
+                <Ionicons name="information-circle-outline" size={20} color="#007AFF" />
+                <Text style={styles.infoText}>
+                  Le système va créer automatiquement un nom d'utilisateur et un mot de passe temporaire.
+                  Le membre devra changer ce mot de passe lors de sa première connexion.
+                </Text>
+              </View>
+              
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => setShowCreateModal(false)}
+                  disabled={isCreatingCode}
+                >
+                  <Text style={styles.cancelButtonText}>Annuler</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.confirmButton]}
+                  onPress={handleCreateCode}
+                  disabled={isCreatingCode}
+                >
+                  {isCreatingCode ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <Text style={styles.confirmButtonText}>Créer</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Modal de confirmation de suppression */}
@@ -584,8 +595,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   actionButton: {
-    padding: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
     marginLeft: 8,
+    backgroundColor: '#F0F8FF',
+    borderRadius: 6,
+  },
+  copyButtonText: {
+    fontSize: 12,
+    color: '#007AFF',
+    marginLeft: 4,
+    fontWeight: '500',
   },
   codeValue: {
     fontSize: 16,
@@ -682,9 +703,16 @@ const styles = StyleSheet.create({
   modalContent: {
     backgroundColor: 'white',
     borderRadius: 12,
-    padding: 20,
-    width: '90%',
-    maxWidth: 400,
+    padding: 24,
+    width: '100%',
+    maxWidth: 500,
+    minHeight: 400,
+  },
+  modalScrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 20,
   },
   modalTitle: {
     fontSize: 18,
