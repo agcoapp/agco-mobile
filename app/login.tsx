@@ -26,8 +26,8 @@ export default function LoginScreen() {
     // Les messages seront gérés différemment selon la destination
     
     if (path === '/register') {
-      // Rediriger vers l'écran d'inscription (temporairement vers tabs)
-      router.replace('/(tabs)');
+      // Rediriger vers l'écran d'inscription
+      router.replace('/register');
     } else if (path === '/(tabs)') {
       // Rediriger vers le dashboard
       router.replace('/(tabs)');

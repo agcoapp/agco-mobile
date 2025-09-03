@@ -222,7 +222,7 @@ export default function LoginForm({
           rejectionReason={rejectionReason}
           onGoToRegister={() => {
             setShowAdhesionModal(false);
-            onRedirect('/(tabs)', 'Vous pouvez maintenant soumettre une nouvelle demande d\'adhésion.');
+            onRedirect('/register', 'Vous pouvez maintenant soumettre une nouvelle demande d\'adhésion.');
           }}
         />
 
@@ -242,22 +242,28 @@ export default function LoginForm({
                     setPendingMessage('Votre adhésion est en attente d\'approbation. Vous serez notifié une fois qu\'elle sera validée.');
                     setShowPendingModal(true);
                   } else if (userStatus.statut_formulaire.statut === 'APPROUVE') {
+                    // Seuls les membres APPROUVE peuvent accéder aux (tabs)
                     onSuccess();
                   } else if (userStatus.statut_formulaire.statut === 'REJETE') {
-                    onRedirect('/(tabs)', 'Votre adhésion précédente a été rejetée. Vous pouvez soumettre une nouvelle demande.');
+                    // Statut rejeté : rediriger vers /register
+                    onRedirect('/register', 'Votre adhésion précédente a été rejetée. Vous pouvez soumettre une nouvelle demande.');
                   } else {
-                    onSuccess();
+                    // Statut inconnu ou autre : rediriger vers /register par sécurité
+                    onRedirect('/register', 'Statut d\'adhésion non reconnu. Veuillez compléter votre formulaire d\'adhésion.');
                   }
                 } catch (adhesionError) {
                   console.error('Erreur lors de la vérification du statut d\'adhésion:', adhesionError);
-                  onSuccess();
+                  // En cas d'erreur, rediriger vers /register par sécurité
+                  onRedirect('/register', 'Erreur lors de la vérification du statut. Veuillez compléter votre formulaire d\'adhésion.');
                 }
               } else {
-                onRedirect('/(tabs)', 'Mot de passe changé avec succès ! Vous pouvez maintenant remplir le formulaire d\'adhésion.');
+                // L'utilisateur n'a pas encore soumis de formulaire, rediriger vers /register
+                onRedirect('/register', 'Mot de passe changé avec succès ! Vous pouvez maintenant remplir le formulaire d\'adhésion.');
               }
             } catch (error) {
               console.error('Erreur lors de la vérification du statut utilisateur:', error);
-              onRedirect('/(tabs)', 'Mot de passe changé avec succès ! Vous pouvez maintenant remplir le formulaire d\'adhésion.');
+              // En cas d'erreur, rediriger vers /register par sécurité
+              onRedirect('/register', 'Erreur lors de la vérification du statut. Veuillez compléter votre formulaire d\'adhésion.');
             }
           }}
         />

@@ -2,11 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   Modal,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View
 } from 'react-native';
 import { useAuth } from '../../hooks/useAuth';
@@ -166,8 +168,9 @@ export default function ForcePasswordChangeModal({
       animationType="slide"
       onRequestClose={handleClose}
     >
-      <View style={styles.overlay}>
-        <View style={styles.modalContainer}>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={styles.overlay}>
+          <View style={styles.modalContainer}>
           <View style={styles.header}>
             <Ionicons
               name="lock-closed"
@@ -256,20 +259,11 @@ export default function ForcePasswordChangeModal({
               </Text>
             </View>
 
-            <View style={styles.requirementsContainer}>
-              <Text style={styles.requirementsTitle}>Exigences du mot de passe :</Text>
-              <Text style={styles.requirement}>• Au moins 8 caractères</Text>
-              <Text style={styles.requirement}>• Au moins une lettre minuscule</Text>
-              <Text style={styles.requirement}>• Au moins une lettre majuscule</Text>
-              <Text style={styles.requirement}>• Au moins un chiffre</Text>
-              <Text style={styles.requirement}>• Au moins un caractère spécial (!@#$%^&*)</Text>
-              
-              <View style={styles.securityWarning}>
-                <Ionicons name="shield-checkmark" size={16} color="#FF6B35" />
-                <Text style={styles.securityText}>
-                  ⚠️ Important : Gardez votre nouveau mot de passe en lieu sûr. Il ne pourra pas être récupéré.
-                </Text>
-              </View>
+            <View style={styles.securityWarning}>
+              <Ionicons name="shield-checkmark" size={16} color="#FF6B35" />
+              <Text style={styles.securityText}>
+                Important : Gardez votre nouveau mot de passe en lieu sûr.
+              </Text>
             </View>
           </View>
 
@@ -288,8 +282,9 @@ export default function ForcePasswordChangeModal({
               )}
             </TouchableOpacity>
           </View>
+          </View>
         </View>
-      </View>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 }
