@@ -6,23 +6,24 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    Image,
-    Keyboard,
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View
 } from 'react-native';
 
+import AdhesionFormGenerator, { AdhesionFormGeneratorRef } from '../components/AdhesionFormGenerator';
 import { useAuth } from '../hooks/useAuth';
 import { apiService } from '../services/apiService';
 
@@ -44,6 +45,7 @@ export default function RegisterScreen() {
   const [showIdIssueDatePicker, setShowIdIssueDatePicker] = useState(false);
   const [showEntryDatePicker, setShowEntryDatePicker] = useState(false);
   const scrollViewRef = React.useRef<ScrollView>(null);
+  const formGeneratorRef = React.useRef<AdhesionFormGeneratorRef>(null);
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -221,117 +223,16 @@ export default function RegisterScreen() {
     }
   };
 
-  // Fonction pour générer l'image PNG de la fiche d'adhésion
-  const generateAdhesionPNG = async (adhesionData: any): Promise<Blob> => {
-    try {
-      // Convertir les images en base64
-      let logoBase64 = '';
-      let photoBase64 = '';
-      let signatureBase64 = '';
-
-      // Logo de l'association - on va utiliser un placeholder pour l'instant
-      // car require() retourne un objet et non une URI string
-      console.log('Logo non converti, utilisation du placeholder');
-      logoBase64 = ''; // Placeholder vide pour le moment
-
-      // Photo de l'adhérent
-      if (adhesionData.photo && typeof adhesionData.photo === 'string') {
-        try {
-          console.log('Conversion de la photo en cours...');
-          photoBase64 = await convertImageToBase64(adhesionData.photo, 200, 0.8);
-          console.log('Photo convertie avec succès, taille:', photoBase64.length);
-        } catch (error) {
-          console.log('Photo non trouvée, utilisation du placeholder:', error);
-          photoBase64 = ''; // Placeholder vide
-        }
-      } else {
-        console.log('Photo non fournie ou invalide');
-        photoBase64 = ''; // Placeholder vide
-      }
-
-      // Signature de l'adhérent
-      if (adhesionData.signature && typeof adhesionData.signature === 'string') {
-        try {
-          console.log('Conversion de la signature en cours...', adhesionData.signature);
-          signatureBase64 = await convertImageToBase64(adhesionData.signature, 250, 0.9);
-          console.log('Signature convertie avec succès, taille:', signatureBase64.length);
-        } catch (error) {
-          console.log('Signature non trouvée:', error);
-          signatureBase64 = ''; // Placeholder vide
-        }
-      } else {
-        console.log('Signature non fournie ou invalide');
-        signatureBase64 = ''; // Placeholder vide
-      }
-
-      // Pour React Native, nous allons créer une image PNG simple
-      console.log('Génération d\'une image PNG simple pour React Native...');
-      
-      // Créer une image simple avec les données du formulaire
-      // Pour l'instant, nous allons utiliser une approche simple avec les données encodées en base64
-      const formImageData = {
-        firstName: adhesionData.firstName,
-        lastName: adhesionData.lastName,
-        birthDate: adhesionData.birthDate,
-        birthPlace: adhesionData.birthPlace,
-        address: adhesionData.address,
-        profession: adhesionData.profession,
-        idNumber: adhesionData.idNumber,
-        idIssueDate: adhesionData.idIssueDate,
-        city: adhesionData.city,
-        entryDate: adhesionData.entryDate,
-        employer: adhesionData.employer,
-        phone: adhesionData.phone,
-        spouseName: adhesionData.spouseName,
-        childrenCount: adhesionData.childrenCount,
-        comment: adhesionData.comment,
-        photo: photoBase64,
-        signature: signatureBase64,
-        logo: logoBase64,
-        status: adhesionData.status,
-        submissionDate: adhesionData.submissionDate,
-        updatedDate: adhesionData.updatedDate
-      };
-
-      // Créer une image PNG simple avec les données encodées
-      const jsonString = JSON.stringify(formImageData, null, 2);
-      
-      // Encoder les données en base64 pour créer une image PNG simple
-      const base64Data = btoa(jsonString);
-      
-      // Créer un objet blob qui simule un PNG
-      const blob = {
-        size: base64Data.length,
-        type: 'image/png',
-        text: () => Promise.resolve(base64Data),
-        arrayBuffer: () => Promise.resolve(new ArrayBuffer(base64Data.length)),
-        stream: () => new ReadableStream({
-          start(controller) {
-            controller.enqueue(new TextEncoder().encode(base64Data));
-            controller.close();
-          }
-        })
-      } as any;
-      
-      console.log('Image de formulaire générée avec succès (format JSON)');
-      return blob;
-      
-    } catch (error) {
-      console.error('Erreur lors de la génération de l\'image PNG:', error);
-      throw new Error('Erreur lors de la génération de l\'image PNG');
-    }
-  };
-
   // Fonction pour uploader le fichier JSON vers Cloudinary avec preset signed
-  const uploadPNGToCloudinary = async (pngBlob: Blob, firstName: string, lastName: string): Promise<string> => {
+  const uploadPNGToCloudinary = async (base64Image: string, firstName: string, lastName: string): Promise<string> => {
     try {
-      // Validation du blob avant l'upload
-      if (!pngBlob || pngBlob.size === 0) {
-        throw new Error('Le blob est vide ou invalide');
+      // Validation de l'image base64 avant l'upload
+      if (!base64Image || base64Image.length === 0) {
+        throw new Error('L\'image base64 est vide ou invalide');
       }      
       
-      // Convertir le blob PNG en base64
-      const base64String = await pngBlob.text();
+      // L'image est déjà en base64, pas besoin de conversion
+      const base64String = base64Image;
       
       // 1. Obtenir la signature Cloudinary via l'API
       console.log('Obtention de la signature Cloudinary...');
@@ -580,6 +481,13 @@ export default function RegisterScreen() {
     setShowEntryDatePicker(false);
   };
 
+  // Fonction pour confirmer la sélection de date et fermer le DatePicker
+  const confirmDateSelection = () => {
+    setShowBirthDatePicker(false);
+    setShowIdIssueDatePicker(false);
+    setShowEntryDatePicker(false);
+  };
+
   // Fonction pour gérer les changements de date
   const handleDateChange = (event: any, selectedDate: Date | undefined, field: string) => {
     // Fermer le DatePicker sur Android
@@ -603,12 +511,8 @@ export default function RegisterScreen() {
       const dateString = selectedDate.toISOString().split('T')[0];
       handleChange(field, dateString);
       
-      // Fermer le DatePicker après sélection sur iOS
-      if (Platform.OS === 'ios') {
-        setShowBirthDatePicker(false);
-        setShowIdIssueDatePicker(false);
-        setShowEntryDatePicker(false);
-      }
+      // Ne pas fermer automatiquement le DatePicker sur iOS
+      // Il ne se fermera que quand l'utilisateur clique sur "Terminer"
     }
   };
 
@@ -857,12 +761,40 @@ export default function RegisterScreen() {
       };
 
       // 3. Générer l'image PNG de la fiche d'adhésion avec les URLs Cloudinary
-      console.log('Génération de l\'image PNG en cours...');
-      const pngBlob = await generateAdhesionPNG(adhesionData);
-      console.log('Image PNG générée avec succès !');
+      console.log('=== DÉBUT GÉNÉRATION FORMULAIRE PNG ===');
+      console.log('Données pour génération:', {
+        firstName: adhesionData.firstName,
+        lastName: adhesionData.lastName,
+        photoUrl: cloudinaryPhotoUrl,
+        signatureUrl: cloudinarySignatureUrl
+      });
+      
+      // Utiliser l'AdhesionFormGenerator pour générer le PNG
+      if (!formGeneratorRef.current) {
+        throw new Error('Référence du générateur de formulaire non disponible');
+      }
 
-      // 4. Uploader l'image PNG vers Cloudinary
-      const cloudinaryFormUrl = await uploadPNGToCloudinary(pngBlob, adhesionData.firstName, adhesionData.lastName);
+      // Convertir le logo en base64 pour le WebView
+      let logoBase64 = '';
+      try {
+        const logoUri = Image.resolveAssetSource(require('../assets/images/logo.png')).uri;
+        logoBase64 = await convertImageToBase64(logoUri, 150, 0.9);
+        console.log('✅ Logo converti en base64');
+      } catch (error) {
+        console.warn('⚠️ Erreur conversion logo:', error);
+      }
+
+      // Générer le PNG avec l'AdhesionFormGenerator en utilisant les URLs Cloudinary
+      const base64Image = await formGeneratorRef.current.generatePNG(logoBase64, cloudinaryPhotoUrl || undefined, cloudinarySignatureUrl || undefined);
+      console.log('Image PNG générée avec succès !');
+      console.log('Taille de l\'image base64:', base64Image.length, 'caractères');
+
+      // 4. Uploader l'image PNG vers Cloudinary avec le preset signed
+      console.log('=== DÉBUT UPLOAD FORMULAIRE VERS CLOUDINARY ===');
+      const cloudinaryFormUrl = await uploadPNGToCloudinary(base64Image, adhesionData.firstName, adhesionData.lastName);
+      console.log('Image PNG uploadée vers Cloudinary avec succès !');
+      console.log('Lien Cloudinary formulaire:', cloudinaryFormUrl);
+      console.log('=== FIN UPLOAD FORMULAIRE ===');
       console.log('Image PNG uploadée vers Cloudinary avec succès !');
       console.log('Lien Cloudinary formulaire:', cloudinaryFormUrl);
 
@@ -902,42 +834,42 @@ export default function RegisterScreen() {
 
       console.log('Données à envoyer:', jsonDataToSend);
 
-      // Soumettre l'adhésion via l'API
-      const response = await apiService.submitAdhesion(jsonDataToSend);
+      // // Soumettre l'adhésion via l'API
+      // const response = await apiService.submitAdhesion(jsonDataToSend);
 
-      console.log('Réponse de l\'API:', response);
+      // console.log('Réponse de l\'API:', response);
 
-      // Définir le message selon le mode
-      const message = isEditing 
-        ? "La fiche d'adhésion a été mise à jour avec succès"
-        : "L'adhésion est bel et bien soumise";
+      // // Définir le message selon le mode
+      // const message = isEditing 
+      //   ? "La fiche d'adhésion a été mise à jour avec succès"
+      //   : "L'adhésion est bel et bien soumise";
       
-             Alert.alert('Succès', message, [
-         {
-           text: 'OK',
-           onPress: async () => {
-             try {
-                               // Nettoyer les images temporaires
-                await cleanupTempImages();
+      //        Alert.alert('Succès', message, [
+      //    {
+      //      text: 'OK',
+      //      onPress: async () => {
+      //        try {
+      //                          // Nettoyer les images temporaires
+      //           await cleanupTempImages();
                 
-                // Vider complètement AsyncStorage
-                await AsyncStorage.clear();
-                console.log('🧹 AsyncStorage complètement vidé');
+      //           // Vider complètement AsyncStorage
+      //           await AsyncStorage.clear();
+      //           console.log('🧹 AsyncStorage complètement vidé');
                 
-                // Déconnecter l'utilisateur
-                await apiService.logout();
-                console.log('👋 Utilisateur déconnecté');
+      //           // Déconnecter l'utilisateur
+      //           await apiService.logout();
+      //           console.log('👋 Utilisateur déconnecté');
                 
-                // Rediriger vers l'écran de login
-                router.replace('/login');
-             } catch (error) {
-               console.error('Erreur lors de la déconnexion:', error);
-               // En cas d'erreur, rediriger quand même vers login
-               router.replace('/login');
-             }
-           }
-         }
-       ]);
+      //           // Rediriger vers l'écran de login
+      //           router.replace('/login');
+      //        } catch (error) {
+      //          console.error('Erreur lors de la déconnexion:', error);
+      //          // En cas d'erreur, rediriger quand même vers login
+      //          router.replace('/login');
+      //        }
+      //      }
+      //    }
+      //  ]);
       
     } catch (err: any) {
       console.error('Erreur lors de la soumission:', err);
@@ -1221,71 +1153,119 @@ export default function RegisterScreen() {
         )}
 
         {/* DatePickers */}
-        {showBirthDatePicker && (
-          <View style={Platform.OS === 'ios' ? styles.datePickerContainer : {}}>
-            {Platform.OS === 'ios' && (
-              <View style={styles.datePickerHeader}>
-                <TouchableOpacity onPress={closeAllDatePickers}>
-                  <Text style={styles.datePickerButton}>Annuler</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={closeAllDatePickers}>
-                  <Text style={styles.datePickerButton}>Terminer</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-            <DateTimePicker
-              value={formData.birthDate ? new Date(formData.birthDate) : new Date()}
-              mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={(event, date) => handleDateChange(event, date, 'birthDate')}
-              maximumDate={new Date()}
+        {(showBirthDatePicker || showIdIssueDatePicker || showEntryDatePicker) && (
+          <View style={styles.datePickerOverlay}>
+            <TouchableOpacity 
+              style={styles.datePickerOverlayTouchable}
+              onPress={closeAllDatePickers}
+              activeOpacity={1}
             />
           </View>
         )}
+        
+                 {showBirthDatePicker && (
+           <View style={styles.datePickerContainer}>
+             {Platform.OS === 'ios' && (
+               <View style={styles.datePickerHeader}>
+                 <TouchableOpacity onPress={closeAllDatePickers}>
+                   <Text style={styles.datePickerButton}>Annuler</Text>
+                 </TouchableOpacity>
+                 <TouchableOpacity onPress={confirmDateSelection}>
+                   <Text style={styles.datePickerButton}>Terminer</Text>
+                 </TouchableOpacity>
+               </View>
+             )}
+             <DateTimePicker
+               value={formData.birthDate ? new Date(formData.birthDate) : new Date()}
+               mode="date"
+               display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+               onChange={(event, date) => handleDateChange(event, date, 'birthDate')}
+               maximumDate={new Date()}
+               textColor="#000000"
+               style={styles.datePicker}
+             />
+           </View>
+         )}
 
-        {showIdIssueDatePicker && (
-          <View style={Platform.OS === 'ios' ? styles.datePickerContainer : {}}>
-            {Platform.OS === 'ios' && (
-              <View style={styles.datePickerHeader}>
-                <TouchableOpacity onPress={closeAllDatePickers}>
-                  <Text style={styles.datePickerButton}>Annuler</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={closeAllDatePickers}>
-                  <Text style={styles.datePickerButton}>Terminer</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-            <DateTimePicker
-              value={formData.idIssueDate ? new Date(formData.idIssueDate) : new Date()}
-              mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={(event, date) => handleDateChange(event, date, 'idIssueDate')}
-              maximumDate={new Date()}
-            />
-          </View>
-        )}
+                 {showIdIssueDatePicker && (
+           <View style={styles.datePickerContainer}>
+             {Platform.OS === 'ios' && (
+               <View style={styles.datePickerHeader}>
+                 <TouchableOpacity onPress={closeAllDatePickers}>
+                   <Text style={styles.datePickerButton}>Annuler</Text>
+                 </TouchableOpacity>
+                 <TouchableOpacity onPress={confirmDateSelection}>
+                   <Text style={styles.datePickerButton}>Terminer</Text>
+                 </TouchableOpacity>
+               </View>
+             )}
+             <DateTimePicker
+               value={formData.idIssueDate ? new Date(formData.idIssueDate) : new Date()}
+               mode="date"
+               display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+               onChange={(event, date) => handleDateChange(event, date, 'idIssueDate')}
+               maximumDate={new Date()}
+               textColor="#000000"
+               style={styles.datePicker}
+             />
+           </View>
+         )}
 
-        {showEntryDatePicker && (
-          <View style={Platform.OS === 'ios' ? styles.datePickerContainer : {}}>
-            {Platform.OS === 'ios' && (
-              <View style={styles.datePickerHeader}>
-                <TouchableOpacity onPress={closeAllDatePickers}>
-                  <Text style={styles.datePickerButton}>Annuler</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={closeAllDatePickers}>
-                  <Text style={styles.datePickerButton}>Terminer</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-            <DateTimePicker
-              value={formData.entryDate ? new Date(formData.entryDate) : new Date()}
-              mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={(event, date) => handleDateChange(event, date, 'entryDate')}
-              maximumDate={new Date()}
-            />
-          </View>
-        )}
+                 {showEntryDatePicker && (
+           <View style={styles.datePickerContainer}>
+             {Platform.OS === 'ios' && (
+               <View style={styles.datePickerHeader}>
+                 <TouchableOpacity onPress={closeAllDatePickers}>
+                   <Text style={styles.datePickerButton}>Annuler</Text>
+                 </TouchableOpacity>
+                 <TouchableOpacity onPress={confirmDateSelection}>
+                   <Text style={styles.datePickerButton}>Terminer</Text>
+                 </TouchableOpacity>
+               </View>
+             )}
+             <DateTimePicker
+               value={formData.entryDate ? new Date(formData.entryDate) : new Date()}
+               mode="date"
+               display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+               onChange={(event, date) => handleDateChange(event, date, 'entryDate')}
+               maximumDate={new Date()}
+               textColor="#000000"
+               style={styles.datePicker}
+             />
+           </View>
+         )}
+
+        {/* Générateur de formulaire PNG (caché) */}
+        <AdhesionFormGenerator
+          ref={formGeneratorRef}
+          adhesionData={{
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            birthDate: formData.birthDate,
+            birthPlace: formData.birthPlace,
+            address: formData.address,
+            profession: formData.profession,
+            idNumber: formData.idNumber,
+            idIssueDate: formData.idIssueDate,
+            city: formData.city,
+            entryDate: formData.entryDate,
+            employer: formData.employer,
+            phone: formData.phone,
+            spouseName: formData.spouseName,
+            childrenCount: formData.childrenCount,
+            comment: formData.comment,
+            status: 'pending'
+          }}
+          logoImage={require('../assets/images/logo.png')}
+          photoImage={photoPreview || undefined}
+          signatureImage={signatureImage || undefined}
+          onImageGenerated={(base64Image) => {
+            console.log('🖼️ Image générée par le composant:', base64Image.length, 'caractères');
+          }}
+          onError={(error) => {
+            console.error('❌ Erreur du générateur:', error);
+          }}
+        />
       </SafeAreaView>
     </TouchableWithoutFeedback>
   );
@@ -1617,16 +1597,24 @@ const styles = StyleSheet.create({
        backgroundColor: 'white',
        minHeight: 100,
      },
-     datePickerContainer: {
-       position: 'absolute',
-       bottom: 0,
-       left: 0,
-       right: 0,
-       backgroundColor: 'white',
-       borderTopWidth: 1,
-       borderTopColor: '#E1E1E1',
-       zIndex: 1000,
-     },
+           datePickerContainer: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: 'white',
+        borderTopWidth: 1,
+        borderTopColor: '#E1E1E1',
+        zIndex: 1000,
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: {
+          width: 0,
+          height: -2,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+      },
      datePickerHeader: {
        flexDirection: 'row',
        justifyContent: 'space-between',
@@ -1636,9 +1624,25 @@ const styles = StyleSheet.create({
        borderBottomColor: '#E1E1E1',
        backgroundColor: '#F8F8F8',
      },
-     datePickerButton: {
-       fontSize: 16,
-       color: '#007AFF',
-       fontWeight: '600',
-     },
+           datePickerButton: {
+        fontSize: 16,
+        color: '#007AFF',
+        fontWeight: '600',
+      },
+      datePickerOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        zIndex: 999,
+      },
+             datePickerOverlayTouchable: {
+         flex: 1,
+       },
+       datePicker: {
+         backgroundColor: 'white',
+         color: '#000000',
+       },
    });
