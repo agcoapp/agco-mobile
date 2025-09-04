@@ -32,6 +32,7 @@ const { width, height } = Dimensions.get('window');
 export default function RegisterScreen() {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [signatureImage, setSignatureImage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -661,9 +662,21 @@ export default function RegisterScreen() {
     return `${day}-${month}-${year}`;
   };
 
+  const getStepText = (step: number) => {
+    const steps = [
+      "(1/5) Envoi de la photo de profil",
+      "(2/5) Envoi de la photo de la signature",
+      "(3/5) Génération de l'image de la fiche d'adhésion",
+      "(4/5) Envoi de l'image de la fiche d'adhésion",
+      "(5/5) Finalisation"
+    ];
+    return steps[step] || "";
+  };
+
   const handleSubmit = async () => {
     setFieldErrors({});
     setIsLoading(true);
+    setCurrentStep(0);
 
     // Validation de tous les champs
     const newFieldErrors: Record<string, string> = {};
@@ -690,6 +703,7 @@ export default function RegisterScreen() {
     if (Object.keys(newFieldErrors).length > 0) {
       setFieldErrors(newFieldErrors);
       setIsLoading(false);
+      setCurrentStep(0); // Réinitialiser l'étape en cas d'erreur de validation
       return;
     }
 
@@ -702,6 +716,7 @@ export default function RegisterScreen() {
 
       // Upload de la photo si elle n'est pas déjà une URL Cloudinary
       if (photoPreview && !photoPreview.includes('cloudinary.com')) {
+        setCurrentStep(0); // Étape 1: Envoi de la photo de profil
         console.log('Upload de la photo vers Cloudinary...');
         try {
           cloudinaryPhotoUrl = await uploadToCloudinary(
@@ -720,6 +735,7 @@ export default function RegisterScreen() {
 
       // Upload de la signature si elle n'est pas déjà une URL Cloudinary
       if (signatureImage && !signatureImage.includes('cloudinary.com')) {
+        setCurrentStep(1); // Étape 2: Envoi de la photo de la signature
         console.log('Upload de la signature vers Cloudinary...');
         try {
           cloudinarySignatureUrl = await uploadToCloudinary(
@@ -761,6 +777,7 @@ export default function RegisterScreen() {
       };
 
       // 3. Générer l'image PNG de la fiche d'adhésion avec les URLs Cloudinary
+      setCurrentStep(2); // Étape 3: Génération de l'image de la fiche d'adhésion
       console.log('=== DÉBUT GÉNÉRATION FORMULAIRE PNG ===');
       console.log('Données pour génération:', {
         firstName: adhesionData.firstName,
@@ -790,6 +807,7 @@ export default function RegisterScreen() {
       console.log('Taille de l\'image base64:', base64Image.length, 'caractères');
 
       // 4. Uploader l'image PNG vers Cloudinary avec le preset signed
+      setCurrentStep(3); // Étape 4: Envoi de l'image de la fiche d'adhésion
       console.log('=== DÉBUT UPLOAD FORMULAIRE VERS CLOUDINARY ===');
       const cloudinaryFormUrl = await uploadPNGToCloudinary(base64Image, adhesionData.firstName, adhesionData.lastName);
       console.log('Image PNG uploadée vers Cloudinary avec succès !');
@@ -834,50 +852,52 @@ export default function RegisterScreen() {
 
       console.log('Données à envoyer:', jsonDataToSend);
 
+      setCurrentStep(4); // Étape 5: Finalisation
       setIsLoading(false);
 
-      // // Soumettre l'adhésion via l'API
-      // const response = await apiService.submitAdhesion(jsonDataToSend);
+      // Soumettre l'adhésion via l'API
+      const response = await apiService.submitAdhesion(jsonDataToSend);
 
-      // console.log('Réponse de l\'API:', response);
+      console.log('Réponse de l\'API:', response);
 
-      // // Définir le message selon le mode
-      // const message = isEditing 
-      //   ? "La fiche d'adhésion a été mise à jour avec succès"
-      //   : "L'adhésion est bel et bien soumise";
+      // Définir le message selon le mode
+      const message = isEditing 
+        ? "La fiche d'adhésion a été mise à jour avec succès"
+        : "L'adhésion est bel et bien soumise";
       
-      //        Alert.alert('Succès', message, [
-      //    {
-      //      text: 'OK',
-      //      onPress: async () => {
-      //        try {
-      //                          // Nettoyer les images temporaires
-      //           await cleanupTempImages();
+             Alert.alert('Succès', message, [
+         {
+           text: 'OK',
+           onPress: async () => {
+             try {
+                               // Nettoyer les images temporaires
+                await cleanupTempImages();
                 
-      //           // Vider complètement AsyncStorage
-      //           await AsyncStorage.clear();
-      //           console.log('🧹 AsyncStorage complètement vidé');
+                // Vider complètement AsyncStorage
+                await AsyncStorage.clear();
+                console.log('🧹 AsyncStorage complètement vidé');
                 
-      //           // Déconnecter l'utilisateur
-      //           await apiService.logout();
-      //           console.log('👋 Utilisateur déconnecté');
+                // Déconnecter l'utilisateur
+                await apiService.logout();
+                console.log('👋 Utilisateur déconnecté');
                 
-      //           // Rediriger vers l'écran de login
-      //           router.replace('/login');
-      //        } catch (error) {
-      //          console.error('Erreur lors de la déconnexion:', error);
-      //          // En cas d'erreur, rediriger quand même vers login
-      //          router.replace('/login');
-      //        }
-      //      }
-      //    }
-      //  ]);
+                // Rediriger vers l'écran de login
+                router.replace('/login');
+             } catch (error) {
+               console.error('Erreur lors de la déconnexion:', error);
+               // En cas d'erreur, rediriger quand même vers login
+               router.replace('/login');
+             }
+           }
+         }
+       ]);
       
     } catch (err: any) {
       console.error('Erreur lors de la soumission:', err);
       let errorMessage = 'Erreur lors de la soumission';
       Alert.alert('Erreur', errorMessage);
       setIsLoading(false);
+      setCurrentStep(0); // Réinitialiser l'étape en cas d'erreur
     }
   };
 
@@ -1126,7 +1146,12 @@ export default function RegisterScreen() {
               disabled={isLoading}
             >
               {isLoading ? (
-                <ActivityIndicator color="white" />
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator color="white" />
+                  <Text style={styles.stepText}>
+                    {getStepText(currentStep)}
+                  </Text>
+                </View>
               ) : (
                 <Text style={styles.submitButtonText}>
                   {isEditing ? 'Soumettre à nouveau' : 'Soumettre l\'adhésion'}
@@ -1170,7 +1195,7 @@ export default function RegisterScreen() {
           </View>
         )}
         
-                 {showBirthDatePicker && (
+        {showBirthDatePicker && (
            <View style={styles.datePickerContainer}>
              {Platform.OS === 'ios' && (
                <View style={styles.datePickerHeader}>
@@ -1550,6 +1575,18 @@ const styles = StyleSheet.create({
      color: 'white',
      fontSize: 16,
      fontWeight: 'bold',
+   },
+   loadingContainer: {
+     alignItems: 'center',
+     justifyContent: 'center',
+   },
+   stepText: {
+     color: 'white',
+     fontSize: 12,
+     fontWeight: '600',
+     textAlign: 'center',
+     marginTop: 8,
+     paddingHorizontal: 10,
    },
    imageModal: {
      position: 'absolute',

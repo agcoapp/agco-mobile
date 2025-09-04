@@ -5,15 +5,19 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  TouchableWithoutFeedback,
+  View
 } from 'react-native';
+
 import { useAuth } from '../../hooks/useAuth';
 import { apiService } from '../../services/apiService';
 
@@ -43,6 +47,16 @@ export default function AdhesionsScreen() {
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [selectedAdhesion, setSelectedAdhesion] = useState<AdhesionForm | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [selectedReason, setSelectedReason] = useState('');
+  const [showReasonPicker, setShowReasonPicker] = useState(false);
+
+  // Raisons de rejet prédéfinies
+  const REJECTION_REASONS = [
+    { value: 'documents_manquants', label: 'Documents Manquants Ou Incomplets' },
+    { value: 'informations_incorrectes', label: 'Informations Incorrectes' },
+    { value: 'photo_illisible', label: 'Photo Non Conforme' },
+    { value: 'autre', label: 'Autre Raison' }
+  ];
 
   // Charger les formulaires d'adhésion
   useEffect(() => {
@@ -176,8 +190,21 @@ export default function AdhesionsScreen() {
     try {
       setActionLoading(id);
       
-      // TODO: Implémenter la validation via l'API
-      console.log('Validation de l\'adhésion:', id);
+      console.log('✅ Validation de l\'adhésion:', id);
+      
+      // Appeler l'API pour valider le formulaire
+      const result = await apiService.approveForm({
+        id_utilisateur: id
+      });
+
+      console.log('✅ Réponse API validation:', result);
+
+      // Mettre à jour la liste locale
+      const updatedAdhesions = adhesions.map(a => 
+        a.id === id ? { ...a, statut: 'APPROUVE' as const } : a
+      );
+      
+      setAdhesions(updatedAdhesions);
       
       Alert.alert(
         'Succès',
@@ -185,13 +212,18 @@ export default function AdhesionsScreen() {
         [{ text: 'OK' }]
       );
       
-    } catch (error) {
-      console.error('Erreur lors de la validation:', error);
+      // Fermer le modal de confirmation seulement après succès
+      setShowValidationModal(false);
+      setSelectedAdhesion(null);
+      
+    } catch (error: any) {
+      console.error('❌ Erreur lors de la validation:', error);
       Alert.alert(
         'Erreur',
-        'Erreur lors de la validation de l\'adhésion',
+        error.message || 'Erreur lors de la validation de l\'adhésion',
         [{ text: 'OK' }]
       );
+      // En cas d'erreur, ne pas fermer le modal pour permettre à l'utilisateur de corriger
     } finally {
       setActionLoading(null);
     }
@@ -201,8 +233,22 @@ export default function AdhesionsScreen() {
     try {
       setActionLoading(id);
       
-      // TODO: Implémenter le rejet via l'API
-      console.log('Rejet de l\'adhésion:', id, 'Raison:', reason);
+      console.log('❌ Rejet de l\'adhésion:', id, 'Raison:', reason);
+      
+      // Appeler l'API pour rejeter le formulaire
+      const result = await apiService.rejectForm({
+        id_utilisateur: id,
+        raison: reason
+      });
+
+      console.log('❌ Réponse API rejet:', result);
+
+      // Mettre à jour la liste locale
+      const updatedAdhesions = adhesions.map(a => 
+        a.id === id ? { ...a, statut: 'REJETE' as const, raison_rejet: reason } : a
+      );
+      
+      setAdhesions(updatedAdhesions);
       
       Alert.alert(
         'Succès',
@@ -210,13 +256,20 @@ export default function AdhesionsScreen() {
         [{ text: 'OK' }]
       );
       
-    } catch (error) {
-      console.error('Erreur lors du rejet:', error);
+      // Fermer le modal de confirmation et nettoyer les états seulement après succès
+      setShowRejectionModal(false);
+      setSelectedAdhesion(null);
+      setSelectedReason('');
+      setRejectionReason('');
+      
+    } catch (error: any) {
+      console.error('❌ Erreur lors du rejet:', error);
       Alert.alert(
         'Erreur',
-        'Erreur lors du rejet de l\'adhésion',
+        error.message || 'Erreur lors du rejet de l\'adhésion',
         [{ text: 'OK' }]
       );
+      // En cas d'erreur, ne pas fermer le modal pour permettre à l'utilisateur de corriger
     } finally {
       setActionLoading(null);
     }
@@ -574,29 +627,91 @@ export default function AdhesionsScreen() {
         </View>
       </Modal>
 
-      {/* Modal de confirmation de rejet */}
-      <Modal
-        visible={showRejectionModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowRejectionModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <ScrollView style={styles.modalContent}>
+        {/* Modal de confirmation de rejet */}
+        <Modal
+          visible={showRejectionModal}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowRejectionModal(false)}
+        >
+                   <KeyboardAvoidingView 
+           style={styles.modalOverlay}
+           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+         >
+           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+             <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Confirmer le rejet</Text>
             <Text style={styles.modalText}>
               Êtes-vous sûr de vouloir rejeter le formulaire de {selectedAdhesion?.nom_complet} ?
             </Text>
             
             <Text style={styles.modalLabel}>Raison du rejet *</Text>
-            <TextInput
-              style={styles.reasonInput}
-              placeholder="Entrez la raison du rejet..."
-              value={rejectionReason}
-              onChangeText={setRejectionReason}
-              multiline
-              numberOfLines={3}
-            />
+            
+            {/* Menu déroulant pour les raisons prédéfinies */}
+            <TouchableOpacity
+              style={styles.pickerContainer}
+              onPress={() => setShowReasonPicker(!showReasonPicker)}
+            >
+              <Text style={[
+                styles.pickerText,
+                !selectedReason && styles.pickerPlaceholder
+              ]}>
+                {selectedReason 
+                  ? REJECTION_REASONS.find(r => r.value === selectedReason)?.label 
+                  : 'Sélectionnez une raison'
+                }
+              </Text>
+              <Ionicons 
+                name={showReasonPicker ? "chevron-up" : "chevron-down"} 
+                size={20} 
+                color="#666" 
+              />
+            </TouchableOpacity>
+            
+            {/* Liste déroulante des raisons */}
+            {showReasonPicker && (
+              <View style={styles.pickerDropdown}>
+                {REJECTION_REASONS.map((reason) => (
+                  <TouchableOpacity
+                    key={reason.value}
+                    style={[
+                      styles.pickerItem,
+                      selectedReason === reason.value && styles.pickerItemSelected
+                    ]}
+                    onPress={() => {
+                      setSelectedReason(reason.value);
+                      setShowReasonPicker(false);
+                    }}
+                  >
+                    <Text style={[
+                      styles.pickerItemText,
+                      selectedReason === reason.value && styles.pickerItemTextSelected
+                    ]}>
+                      {reason.label}
+                    </Text>
+                    {selectedReason === reason.value && (
+                      <Ionicons name="checkmark" size={16} color="#007AFF" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            
+            {/* Raison personnalisée */}
+            {selectedReason === 'autre' && (
+              <>
+                <Text style={styles.modalLabel}>Précisez la raison</Text>
+                <TextInput
+                  style={styles.reasonInput}
+                  placeholder="Entrez la raison du rejet..."
+                  value={rejectionReason}
+                  onChangeText={setRejectionReason}
+                  multiline
+                  numberOfLines={3}
+                />
+              </>
+            )}
             
             <View style={styles.modalActions}>
               <TouchableOpacity
@@ -604,27 +719,37 @@ export default function AdhesionsScreen() {
                 onPress={() => {
                   setShowRejectionModal(false);
                   setRejectionReason('');
+                  setSelectedReason('');
                 }}
               >
                 <Text style={styles.cancelButtonText}>Annuler</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalButton, styles.rejectButton]}
+                style={[
+                  styles.modalButton, 
+                  styles.rejectButton,
+                  (!selectedReason || (selectedReason === 'autre' && !rejectionReason.trim())) && styles.disabledButton
+                ]}
                 onPress={() => {
-                  if (selectedAdhesion && rejectionReason.trim()) {
-                    handleRejectAdhesion(selectedAdhesion.id, rejectionReason.trim());
+                  if (selectedAdhesion) {
+                    const finalReason = selectedReason === 'autre' ? rejectionReason : selectedReason;
+                    if (finalReason.trim()) {
+                      handleRejectAdhesion(selectedAdhesion.id, finalReason.trim());
+                    }
                   }
                   setShowRejectionModal(false);
                   setRejectionReason('');
+                  setSelectedReason('');
                 }}
-                disabled={!rejectionReason.trim()}
+                disabled={!selectedReason || (selectedReason === 'autre' && !rejectionReason.trim())}
               >
                 <Text style={styles.rejectButtonText}>Rejeter</Text>
               </TouchableOpacity>
-            </View>
-          </ScrollView>
-        </View>
-      </Modal>
+                                                   </View>
+             </View>
+           </TouchableWithoutFeedback>
+          </KeyboardAvoidingView>
+       </Modal>
     </SafeAreaView>
   );
 }
@@ -859,14 +984,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  modalContent: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 24,
-    margin: 20,
-    maxWidth: '90%',
-    maxHeight: '80%',
-  },
+                                               modalContent: {
+          backgroundColor: 'white',
+          borderRadius: 12,
+          padding: 24,
+          margin: 20,
+          maxWidth: '90%',
+          width: '90%',
+          maxHeight: '80%',
+        },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -925,4 +1051,55 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: 'white',
   },
+     // Styles pour le picker de raisons
+   pickerContainer: {
+     flexDirection: 'row',
+     justifyContent: 'space-between',
+     alignItems: 'center',
+     padding: 16,
+     borderWidth: 1,
+     borderColor: '#E1E1E1',
+     borderRadius: 8,
+     backgroundColor: 'white',
+     marginBottom: 20,
+   },
+   pickerText: {
+     fontSize: 16,
+     color: '#333',
+     flex: 1,
+   },
+   pickerPlaceholder: {
+     color: '#999',
+   },
+   pickerDropdown: {
+     backgroundColor: 'white',
+     borderWidth: 1,
+     borderColor: '#E1E1E1',
+     borderRadius: 8,
+     marginBottom: 20,
+     maxHeight: 200,
+   },
+   pickerItem: {
+     flexDirection: 'row',
+     justifyContent: 'space-between',
+     alignItems: 'center',
+     padding: 16,
+     borderBottomWidth: 1,
+     borderBottomColor: '#F0F0F0',
+   },
+   pickerItemSelected: {
+     backgroundColor: '#F0F8FF',
+   },
+   pickerItemText: {
+     fontSize: 14,
+     color: '#333',
+     flex: 1,
+   },
+   pickerItemTextSelected: {
+     color: '#007AFF',
+     fontWeight: '600',
+   },
+   disabledButton: {
+     backgroundColor: '#CCCCCC',
+   },
 });
