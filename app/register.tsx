@@ -366,7 +366,7 @@ export default function RegisterScreen() {
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
-        aspect: type === 'photo' ? [3, 4] : [4, 1],
+        aspect: [3, 4],
         quality: 0.9,
         base64: false,
         exif: false,
@@ -385,8 +385,8 @@ export default function RegisterScreen() {
           [
             {
               resize: {
-                width: type === 'photo' ? 300 : 400,
-                height: type === 'photo' ? 400 : 100,
+                width: 300,
+                height: 400,
               },
             },
 
@@ -419,7 +419,7 @@ export default function RegisterScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
-        aspect: type === 'photo' ? [3, 4] : [4, 1],
+        aspect: [3, 4],
         quality: 0.9,
         base64: false,
         exif: false,
@@ -439,8 +439,8 @@ export default function RegisterScreen() {
           [
             {
               resize: {
-                width: type === 'photo' ? 300 : 400,
-                height: type === 'photo' ? 400 : 100,
+                width: 300,
+                height: 400,
               },
             },
           ],
@@ -1058,51 +1058,56 @@ export default function RegisterScreen() {
              {renderField('Nombre d\'enfants', 'childrenCount', '', 'number')}
              {renderField('Commentaire', 'comment', 'Optionnel', 'textarea')}
 
-            {/* Zone signature */}
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Signature</Text>
-              <View style={styles.signatureContainer}>
-                                 {signatureImage ? (
-                   <View style={styles.signaturePreview}>
-                     <TouchableOpacity onPress={() => openImageModal(signatureImage)}>
-                       <Image source={{ uri: signatureImage }} style={styles.signatureImage} />
-                     </TouchableOpacity>
-                     <TouchableOpacity 
-                       style={styles.removeButton}
-                       onPress={async () => {
-                         setSignatureImage(null);
-                         try {
-                           await AsyncStorage.removeItem('adhesion_signature');
-                           console.log('🗑️ Signature supprimée d\'AsyncStorage');
-                         } catch (error) {
-                           console.error('Erreur lors de la suppression de la signature:', error);
-                         }
-                       }}
-                     >
-                       <Ionicons name="close" size={16} color="white" />
-                     </TouchableOpacity>
-                   </View>
-                ) : (
-                                     <TouchableOpacity 
-                     style={styles.signatureUploadButton}
-                     onPress={() => showImageOptions('signature')}
-                     disabled={isUploadingSignature}
+          </View>
+
+           {/* Signature - Section séparée comme la photo */}
+           <View style={styles.photoSection}>
+             <Text style={styles.photoTitle}>Signature</Text>
+             <View style={styles.signatureContainer}>
+               {signatureImage ? (
+                 <View style={styles.signaturePreview}>
+                   <TouchableOpacity onPress={() => openImageModal(signatureImage)}>
+                     <Image source={{ uri: signatureImage }} style={styles.signatureImage} />
+                   </TouchableOpacity>
+                   <TouchableOpacity 
+                     style={styles.removeButton}
+                     onPress={async () => {
+                       setSignatureImage(null);
+                       try {
+                         await AsyncStorage.removeItem('adhesion_signature');
+                         console.log('🗑️ Signature supprimée d\'AsyncStorage');
+                       } catch (error) {
+                         console.error('Erreur lors de la suppression de la signature:', error);
+                       }
+                     }}
                    >
-                                         {isUploadingSignature ? (
-                       <ActivityIndicator color="#007AFF" />
-                     ) : (
-                       <>
-                         <Ionicons name="create" size={24} color="#007AFF" />
-                         <Text style={styles.signatureUploadText}>Prendre/Choisir une signature</Text>
-                       </>
-                     )}
-                  </TouchableOpacity>
-                )}
-              </View>
-              {fieldErrors.signature && (
-                <Text style={styles.errorText}>{fieldErrors.signature}</Text>
-              )}
-            </View>
+                     <Ionicons name="close" size={16} color="white" />
+                   </TouchableOpacity>
+                 </View>
+               ) : (
+                 <TouchableOpacity 
+                   style={styles.signatureUploadButton}
+                   onPress={() => showImageOptions('signature')}
+                   disabled={isUploadingSignature}
+                 >
+                   {isUploadingSignature ? (
+                     <ActivityIndicator color="#007AFF" />
+                   ) : (
+                     <>
+                       <Ionicons name="create" size={32} color="#007AFF" />
+                       <Text style={styles.photoUploadText}>Prendre/Choisir une signature</Text>
+                     </>
+                   )}
+                 </TouchableOpacity>
+               )}
+             </View>
+             {fieldErrors.signature && (
+               <Text style={styles.errorText}>{fieldErrors.signature}</Text>
+             )}
+           </View>
+
+           {/* Formulaire */}
+           <View style={styles.formContainer}>
 
             {/* Déclaration */}
             <View style={styles.declarationContainer}>
@@ -1470,31 +1475,41 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   signatureContainer: {
-    borderWidth: 1,
-    borderColor: '#E1E1E1',
-    borderRadius: 8,
-    padding: 16,
+    borderRadius: 12,
+    padding: 10,
     backgroundColor: 'white',
     alignItems: 'center',
-    minHeight: 150,
-  },
-  signatureUploadButton: {
-    alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
+    minHeight: 150,
+    minWidth: 120,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
-  signatureUploadText: {
-    marginTop: 8,
-    fontSize: 14,
-    color: '#007AFF',
-  },
+     signatureUploadButton: {
+     alignItems: 'center',
+     justifyContent: 'center',
+     padding: 20,
+   },
+   signatureUploadText: {
+     marginTop: 12,
+     fontSize: 16,
+     color: '#007AFF',
+     fontWeight: '600',
+     textAlign: 'center',
+   },
   signaturePreview: {
     position: 'relative',
   },
   signatureImage: {
-    width: 200,
+    width: 120,
     height: 150,
-    borderRadius: 4,
+    borderRadius: 8,
   },
   removeButton: {
     position: 'absolute',
