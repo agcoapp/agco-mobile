@@ -25,8 +25,8 @@ const AdhesionFormGenerator = forwardRef<AdhesionFormGeneratorRef, AdhesionFormG
     console.log('photoImage', photoImage);
     console.log('signatureImage', signatureImage);
 
-    const generateHTML = (data: any, logoBase64?: string, photoUrl?: string, signatureUrl?: string) => {
-      const htmlTemplate = `<!DOCTYPE html>
+         const generateHTML = (data: any, logoBase64?: string, photoUrl?: string, signatureUrl?: string) => {
+       const htmlTemplate = `<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
@@ -36,7 +36,7 @@ const AdhesionFormGenerator = forwardRef<AdhesionFormGeneratorRef, AdhesionFormG
         :root {
             --a4-width: 210mm;
             --a4-height: 297mm;
-            --a4-aspect-ratio: 0.707;
+            --a4-aspect-ratio: 0.707; /* 210 / 297 */
         }
 
         @page {
@@ -80,6 +80,7 @@ const AdhesionFormGenerator = forwardRef<AdhesionFormGeneratorRef, AdhesionFormG
             transform-origin: top left;
         }
 
+        /* En-tête avec logo - CENTRÉ */
         .header {
             display: flex;
             align-items: center;
@@ -99,7 +100,7 @@ const AdhesionFormGenerator = forwardRef<AdhesionFormGeneratorRef, AdhesionFormG
         .logo img {
             width: 100%;
             height: 100%;
-            object-fit: contain;
+            object-fit: cover;
         }
 
         .association-info {
@@ -122,12 +123,13 @@ const AdhesionFormGenerator = forwardRef<AdhesionFormGeneratorRef, AdhesionFormG
         }
 
         .association-details {
-            font-size: 11px;
+            font-size: 7px;
             color: #666;
             line-height: 1.2;
             font-weight: bold;
         }
 
+        /* Titre et photo sur la même ligne */
         .title-photo-section {
             display: flex;
             justify-content: center;
@@ -199,9 +201,9 @@ const AdhesionFormGenerator = forwardRef<AdhesionFormGeneratorRef, AdhesionFormG
         .form-section { margin-bottom: 20px; }
         .form-field { margin-bottom: 8px; display: flex; align-items: baseline; page-break-inside: avoid; }
         .field-label { font-weight: bold; min-width: 180px; margin-right: 8px; font-size: 12px; }
-        .field-value { flex: 1; border-bottom: 1px dotted #000; padding-bottom: 1px; min-height: 14px; font-size: 12px; }
+        .field-value { flex: 1; border-bottom: 1px dotted #000; padding-bottom: 1px; min-height: 14px; font-size: 9px; }
         .field-value-inline { display: inline-block; border-bottom: 1px dotted #000; padding-bottom: 1px; margin: 0 3px; min-width: 120px; font-size: 12px; }
-        .declaration { text-align: right; font-style: italic; margin: 15px 0; font-size: 11px; line-height: 1.3; margin-right: 10%; }
+        .declaration { text-align: right; font-style: italic; margin: 15px 0; font-size: 8px; line-height: 1.3; margin-right: 10%; }
         .signatures { display: flex; justify-content: space-between; margin-top: 20px; page-break-inside: avoid; }
         .signature-box { text-align: center; width: 45%; }
         .signature-label { font-weight: bold; margin-bottom: 30px; font-size: 12px; }
@@ -209,23 +211,22 @@ const AdhesionFormGenerator = forwardRef<AdhesionFormGeneratorRef, AdhesionFormG
         .signature-right { display: flex; flex-direction: column; align-items: center; text-align: center; width: 45%; }
         .lu-approuve { font-size: 11px; margin-top: 15px; }
 
-        .signature-image {
-            max-width: 100%;
-            max-height: 120px;
-            object-fit: contain;
-        }
-
-        @media screen and (max-width: 833px) {
+        /* --- RESPONSIVE SCALING --- */
+        @media screen and (max-width: 833px) { /* 210mm is ~833px at 1.25 device pixel ratio */
             .page-wrapper {
+                /* Calculate the scaled height to avoid empty space */
+                /* height = wrapper_width / aspect_ratio */
                 height: calc(100vw / var(--a4-aspect-ratio));
                 max-height: calc( (var(--a4-width) - 40px) / var(--a4-aspect-ratio) );
             }
             .container {
+                /* Scale the container to fit the wrapper width */
                 --scale-factor: calc( (100vw - 40px) / var(--a4-width) );
                 transform: scale(var(--scale-factor));
             }
         }
 
+        /* --- PRINT STYLES --- */
         @media print {
             body {
                 background: white;
@@ -255,9 +256,9 @@ const AdhesionFormGenerator = forwardRef<AdhesionFormGeneratorRef, AdhesionFormG
             <div class="header">
                 <div class="logo">
                     ${logoBase64 ? 
-                        `<img src="${logoBase64}" alt="Logo AGC" style="width: 100%; height: 100%; object-fit: contain;" />` : 
+                        `<img src="${logoBase64}" alt="Logo AGCO" />` : 
                         `<div style="width: 100%; height: 100%; background: #f9f9f9; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #666;">
-                            Logo AGC
+                            Logo AGCO
                         </div>`
                     }
                 </div>
@@ -278,12 +279,12 @@ const AdhesionFormGenerator = forwardRef<AdhesionFormGeneratorRef, AdhesionFormG
                         <div class="title">FICHE D'ADHÉSION</div>
                     </div>
                 </div>
-                                 <div class="photo-box photo-box-positioned">
-                     ${photoUrl ? 
-                         `<img src="${photoUrl}" alt="Photo du membre" />` : 
-                         `<div class="photo-placeholder">PHOTO</div>`
-                     }
-                 </div>
+                <div class="photo-box photo-box-positioned">
+                    ${photoUrl ? 
+                        `<img src="${photoUrl}" alt="Photo du membre" />` : 
+                        `<div class="photo-placeholder">PHOTO</div>`
+                    }
+                </div>
             </div>
 
             <!-- Numéro d'adhésion centré -->
@@ -297,72 +298,65 @@ const AdhesionFormGenerator = forwardRef<AdhesionFormGeneratorRef, AdhesionFormG
             <div class="form-section">
                 <div class="form-field">
                     <span class="field-label">Nom(s) :</span>
-                    <span class="field-value">${data.lastName || 'Non spécifié'}</span>
+                    <span class="field-value">${data.lastName || ''}</span>
                 </div>
 
                 <div class="form-field">
                     <span class="field-label">Prénom(s) :</span>
-                    <span class="field-value">${data.firstName || 'Non spécifié'}</span>
+                    <span class="field-value">${data.firstName || ''}</span>
                 </div>
 
                 <div class="form-field">
                     <span class="field-label">Date et lieu de Naissance :</span>
-                    <span class="field-value">${data.birthDate || 'Non spécifiée'} à ${data.birthPlace || 'Non spécifié'}</span>
+                    <span class="field-value">${data.birthDate || ''} ${data.birthPlace ? `à ${data.birthPlace}` : ''}</span>
                 </div>
 
                 <div class="form-field">
                     <span class="field-label">Adresse :</span>
-                    <span class="field-value">${data.address || 'Non spécifiée'}</span>
+                    <span class="field-value">${data.address || ''}</span>
                 </div>
 
                 <div class="form-field">
                     <span class="field-label">Profession :</span>
-                    <span class="field-value">${data.profession || 'Non spécifiée'}</span>
+                    <span class="field-value">${data.profession || ''}</span>
                 </div>
 
                 <div class="form-field">
-                    <span class="field-label">N° de Carte d'identité consulaire :</span>
-                    <span class="field-value-inline">${data.idNumber || 'Non spécifié'}</span>
+                    <span class="field-label">N° de ${data.idType || 'Carte d\'identité consulaire'} :</span>
+                    <span class="field-value-inline">${data.idNumber || ''}</span>
                     <span style="margin-left: 20px;">Délivré le :</span>
-                    <span class="field-value-inline">${data.idIssueDate || 'Non spécifiée'}</span>
+                    <span class="field-value-inline">${data.idIssueDate || ''}</span>
                 </div>
 
                 <div class="form-field">
                     <span class="field-label">Ville de Résidence :</span>
-                    <span class="field-value">${data.city || 'Non spécifiée'}</span>
+                    <span class="field-value">${data.city || ''}</span>
                 </div>
 
                 <div class="form-field">
                     <span class="field-label">Date d'entrée au Congo :</span>
-                    <span class="field-value">${data.entryDate || 'Non spécifiée'}</span>
+                    <span class="field-value">${data.entryDate || ''}</span>
                 </div>
 
                 <div class="form-field">
                     <span class="field-label">Employeur / Université / École :</span>
-                    <span class="field-value">${data.employer || 'Non spécifié'}</span>
+                    <span class="field-value">${data.employer || ''}</span>
                 </div>
 
                 <div class="form-field">
                     <span class="field-label">Téléphone :</span>
-                    <span class="field-value">${data.phone || 'Non spécifié'}</span>
+                    <span class="field-value">${data.phone || ''}</span>
                 </div>
 
                 <div class="form-field">
                     <span class="field-label">Nom et Prénom du Conjoint(e) :</span>
-                    <span class="field-value">${data.spouseName || 'Non renseigné'}</span>
+                    <span class="field-value">${data.spouseName || ''}</span>
                 </div>
 
                 <div class="form-field">
                     <span class="field-label">Nombre d'enfant :</span>
-                    <span class="field-value">${data.childrenCount || 0}</span>
+                    <span class="field-value">${data.childrenCount || ''}</span>
                 </div>
-
-                ${data.comment ? `
-                <div class="form-field">
-                    <span class="field-label">Commentaire :</span>
-                    <span class="field-value">${data.comment}</span>
-                </div>
-                ` : ''}
             </div>
 
             <!-- Déclaration -->
@@ -375,23 +369,21 @@ const AdhesionFormGenerator = forwardRef<AdhesionFormGeneratorRef, AdhesionFormG
             <div class="signatures">
                 <div class="signature-box">
                     <div class="signature-label">Signature du Président(e)</div>
+                    <div class="signature-space"></div>
                 </div>
-                                 <div class="signature-right">
-                     <div class="signature-label">Signature de l'Adhérent(e)</div>
-                     ${signatureUrl ? 
-                         `<img src="${signatureUrl}" alt="Signature de l'Adhérent" class="signature-image" />` : 
-                         `<div class="signature-space"></div>`
-                     }
-                     <div class="lu-approuve">Lu et Approuvé</div>
-                 </div>
+                <div class="signature-right">
+                    <div class="signature-label">Signature de l'Adhérent(e)</div>
+                    <div class="signature-space"></div>
+                    <div class="lu-approuve">Lu et Approuvé</div>
+                </div>
             </div>
         </div>
     </div>
 </body>
 </html>`;
 
-      return htmlTemplate;
-    };
+       return htmlTemplate;
+     };
 
     const generatePNG = async (logoBase64?: string, photoUrl?: string, signatureUrl?: string): Promise<string> => {
       try {
@@ -411,6 +403,14 @@ const AdhesionFormGenerator = forwardRef<AdhesionFormGeneratorRef, AdhesionFormG
 
         // Mettre à jour le HTML avec les images
         const updatedHtmlContent = generateHTML(adhesionData, finalLogoBase64, finalPhotoUrl, finalSignatureUrl);
+        
+        // Mettre à jour le contenu du WebView
+        if (webViewRef.current) {
+          webViewRef.current.injectJavaScript(`
+            document.body.innerHTML = \`${updatedHtmlContent}\`;
+            true;
+          `);
+        }
         
         // Attendre que le WebView soit chargé
         await new Promise(resolve => setTimeout(resolve, 2000));

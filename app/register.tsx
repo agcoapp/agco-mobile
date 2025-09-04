@@ -834,6 +834,8 @@ export default function RegisterScreen() {
 
       console.log('Données à envoyer:', jsonDataToSend);
 
+      setIsLoading(false);
+
       // // Soumettre l'adhésion via l'API
       // const response = await apiService.submitAdhesion(jsonDataToSend);
 
