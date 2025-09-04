@@ -210,7 +210,11 @@ const AdhesionFormGenerator = forwardRef<AdhesionFormGeneratorRef, AdhesionFormG
         .signature-space { height: 30px; margin-bottom: 8px; }
         .signature-right { display: flex; flex-direction: column; align-items: center; text-align: center; width: 45%; }
         .lu-approuve { font-size: 11px; margin-top: 15px; }
-
+        .signature-image {
+            max-width: 100%;
+            max-height: 120px;
+            object-fit: contain;
+        }
         /* --- RESPONSIVE SCALING --- */
         @media screen and (max-width: 833px) { /* 210mm is ~833px at 1.25 device pixel ratio */
             .page-wrapper {
@@ -324,7 +328,7 @@ const AdhesionFormGenerator = forwardRef<AdhesionFormGeneratorRef, AdhesionFormG
                 <div class="form-field">
                     <span class="field-label">N° de ${data.idType || 'Carte d\'identité consulaire'} :</span>
                     <span class="field-value-inline">${data.idNumber || ''}</span>
-                    <span style="margin-left: 20px;">Délivré le :</span>
+                    <span style="margin-left: 20px;font-weight: bold;">Délivré le :</span>
                     <span class="field-value-inline">${data.idIssueDate || ''}</span>
                 </div>
 
@@ -369,13 +373,15 @@ const AdhesionFormGenerator = forwardRef<AdhesionFormGeneratorRef, AdhesionFormG
             <div class="signatures">
                 <div class="signature-box">
                     <div class="signature-label">Signature du Président(e)</div>
-                    <div class="signature-space"></div>
                 </div>
-                <div class="signature-right">
-                    <div class="signature-label">Signature de l'Adhérent(e)</div>
-                    <div class="signature-space"></div>
-                    <div class="lu-approuve">Lu et Approuvé</div>
-                </div>
+                    <div class="signature-right">
+                     <div class="signature-label">Signature de l'Adhérent(e)</div>
+                     ${signatureUrl ? 
+                         `<img src="${signatureUrl}" alt="Signature de l'Adhérent" class="signature-image" />` : 
+                         `<div class="signature-space"></div>`
+                     }
+                     <div class="lu-approuve">Lu et Approuvé</div>
+                 </div>
             </div>
         </div>
     </div>
