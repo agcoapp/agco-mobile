@@ -155,7 +155,7 @@ export default function CodesScreen() {
 
   const copyToClipboard = async (item: UtilisateurCredentials) => {
     try {
-      const credentialsText = `𝗡𝗼𝗺 𝗱'𝘂𝘁𝗶𝗹𝗶𝘀𝗮𝘁𝗲𝘂𝗿: ${item.nom_utilisateur}\n𝗖𝗼𝗱𝗲 𝗱'𝗮𝗰𝗰𝗲̀𝘀: ${item.mot_passe_temporaire}\nLien de connexion: https://agco-psi.vercel.app?code=${item.mot_passe_temporaire}&username=${item.nom_utilisateur}`;
+      const credentialsText = `𝗡𝗼𝗺 𝗱'𝘂𝘁𝗶𝗹𝗶𝘀𝗮𝘁𝗲𝘂𝗿: ${item.nom_utilisateur}\n𝗖𝗼𝗱𝗲 𝗱'𝗮𝗰𝗰𝗲̀𝘀: ${item.mot_passe_temporaire}\n𝗟𝗶𝗲𝗻 𝗱𝗲 𝗰𝗼𝗻𝗻𝗲𝘅𝗶𝗼𝗻: https://agco-psi.vercel.app?code=${item.mot_passe_temporaire}&username=${item.nom_utilisateur}`;
       await Clipboard.setString(credentialsText);
       setToastMessage('Identifiants et lien copiés dans le presse-papier');
       setToastType('success');

@@ -1,11 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import {
-    Modal,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 interface AdhesionPendingModalProps {
@@ -39,13 +39,6 @@ export default function AdhesionPendingModal({
 
           <View style={styles.content}>
             <Text style={styles.message}>{message}</Text>
-            
-            <View style={styles.infoContainer}>
-              <Ionicons name="information-circle" size={20} color="#007AFF" />
-              <Text style={styles.infoText}>
-                Vous recevrez une notification dès que votre adhésion sera validée.
-              </Text>
-            </View>
           </View>
 
           <View style={styles.actions}>

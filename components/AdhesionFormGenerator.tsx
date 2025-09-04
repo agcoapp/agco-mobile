@@ -361,6 +361,11 @@ const AdhesionFormGenerator = forwardRef<AdhesionFormGeneratorRef, AdhesionFormG
                     <span class="field-label">Nombre d'enfant :</span>
                     <span class="field-value">${data.childrenCount || ''}</span>
                 </div>
+
+                <div class="form-field">
+                    <span class="field-label">Commentaire :</span>
+                    <span class="field-value">${data.comment || ''}</span>
+                </div>
             </div>
 
             <!-- Déclaration -->

@@ -120,19 +120,32 @@ export default function RegisterScreen() {
           // Préremplir le formulaire avec les données du snapshot
           if (userStatus.formulaire_adhesion?.donnees_snapshot) {
             const snapshot = userStatus.formulaire_adhesion.donnees_snapshot;
-            console.log('📋 Données du snapshot pour préremplissage:', snapshot);
+            console.log('Date de naissance : ', snapshot.date_naissance)
+            
+            // Fonction pour convertir DD-MM-YYYY vers YYYY-MM-DD
+            const convertDateFromDDMMYYYY = (dateString: string): string => {
+              if (!dateString) return '';
+              const parts = dateString.split('-');
+              if (parts.length === 3) {
+                const [day, month, year] = parts;
+                return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+              }
+              return '';
+            };
+            
+            console.log('Date de naissance Convertie : ', convertDateFromDDMMYYYY(snapshot.date_naissance));
             
             const preFilledData = {
               firstName: snapshot.prenoms || '',
               lastName: snapshot.nom || '',
-              birthDate: snapshot.date_naissance ? new Date(snapshot.date_naissance).toISOString().split('T')[0] : '',
+              birthDate: convertDateFromDDMMYYYY(snapshot.date_naissance),
               birthPlace: snapshot.lieu_naissance || '',
               address: snapshot.adresse || '',
               profession: snapshot.profession || '',
               idNumber: snapshot.numero_carte_consulaire || '',
-              idIssueDate: snapshot.date_emission_piece ? new Date(snapshot.date_emission_piece).toISOString().split('T')[0] : '',
+              idIssueDate: convertDateFromDDMMYYYY(snapshot.date_emission_piece),
               city: snapshot.ville_residence || '',
-              entryDate: snapshot.date_entree_congo ? new Date(snapshot.date_entree_congo).toISOString().split('T')[0] : '',
+              entryDate: convertDateFromDDMMYYYY(snapshot.date_entree_congo),
               employer: snapshot.employeur_ecole || '',
               phone: snapshot.telephone || '',
               spouseName: snapshot.prenom_conjoint && snapshot.nom_conjoint ? `${snapshot.prenom_conjoint} ${snapshot.nom_conjoint}` : '',
@@ -255,10 +268,10 @@ export default function RegisterScreen() {
        
        // 3. Uploader vers Cloudinary avec la signature
        console.log('Upload vers Cloudinary avec signature...');
-       const response = await fetch(`https://api.cloudinary.com/v1_1/${cloud_name}/image/upload`, {
-        method: 'POST',
-        body: formData,
-      });
+        const response = await fetch(`https://api.cloudinary.com/v1_1/${cloud_name}/image/upload`, {
+          method: 'POST',
+          body: formData,
+        });
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -813,8 +826,6 @@ export default function RegisterScreen() {
       console.log('Image PNG uploadée vers Cloudinary avec succès !');
       console.log('Lien Cloudinary formulaire:', cloudinaryFormUrl);
       console.log('=== FIN UPLOAD FORMULAIRE ===');
-      console.log('Image PNG uploadée vers Cloudinary avec succès !');
-      console.log('Lien Cloudinary formulaire:', cloudinaryFormUrl);
 
              // Préparer les données pour l'API avec les URLs Cloudinary
        const adhesionRequest = {
@@ -849,8 +860,6 @@ export default function RegisterScreen() {
           jsonDataToSend[key] = value;
         }
       });
-
-      console.log('Données à envoyer:', jsonDataToSend);
 
       setCurrentStep(4); // Étape 5: Finalisation
       setIsLoading(false);
@@ -1497,8 +1506,8 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   photoImage: {
-    width: 120,
-    height: 150,
+    width: 170,
+    height: 200,
     borderRadius: 8,
   },
   signatureContainer: {
@@ -1534,8 +1543,8 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   signatureImage: {
-    width: 120,
-    height: 150,
+    width: 170,
+    height: 200,
     borderRadius: 8,
   },
   removeButton: {
