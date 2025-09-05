@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,6 +19,9 @@ import {
   View
 } from 'react-native';
 
+import AdhesionFormGenerator, { AdhesionFormGeneratorRef } from '../../components/AdhesionFormGenerator';
+import CarteRectoGenerator, { CarteRectoGeneratorRef } from '../../components/CarteRectoGenerator';
+import CarteVersoGenerator, { CarteVersoGeneratorRef } from '../../components/CarteVersoGenerator';
 import { useAuth } from '../../hooks/useAuth';
 import { apiService } from '../../services/apiService';
 
@@ -49,6 +53,11 @@ export default function AdhesionsScreen() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [selectedReason, setSelectedReason] = useState('');
   const [showReasonPicker, setShowReasonPicker] = useState(false);
+
+  // Références aux générateurs
+  const adhesionFormGeneratorRef = useRef<AdhesionFormGeneratorRef>(null);
+  const carteRectoGeneratorRef = useRef<CarteRectoGeneratorRef>(null);
+  const carteVersoGeneratorRef = useRef<CarteVersoGeneratorRef>(null);
 
   // Raisons de rejet prédéfinies
   const REJECTION_REASONS = [
@@ -186,25 +195,415 @@ export default function AdhesionsScreen() {
     }
   };
 
+  // Fonction pour convertir une image en base64 avec transparence (adaptée pour React Native)
+  const convertImageToBase64WithTransparency = async (imageUrl: string | any, maxWidth: number = 300, quality: number = 0.8, preserveTransparency: boolean = false): Promise<string> => {
+    try {
+      // Vérifier que imageUrl est défini
+      if (!imageUrl) {
+        throw new Error('URL d\'image non définie');
+      }
+      
+      // Déterminer si c'est une image externe (Cloudinary) ou locale
+      const isExternalImage = typeof imageUrl === 'string' && (imageUrl.startsWith('http') || imageUrl.startsWith('https'));
+      
+      
+      // Traiter l'image avec expo-image-manipulator
+      const processedImage = await ImageManipulator.manipulateAsync(
+        imageUrl,
+        [
+          {
+            resize: {
+              width: maxWidth,
+              height: Math.round((maxWidth * 4) / 3), // Ratio 3:4 par défaut
+            },
+          },
+        ],
+        {
+          compress: quality,
+          format: preserveTransparency ? ImageManipulator.SaveFormat.PNG : ImageManipulator.SaveFormat.JPEG,
+          base64: true,
+        }
+      );
+      
+      if (processedImage.base64) {
+        const format = preserveTransparency ? 'image/png' : 'image/jpeg';
+        return `data:${format};base64,${processedImage.base64}`;
+      } else {
+        throw new Error('Impossible de générer le base64');
+      }
+    } catch (error) {
+      // Ne pas logger l'erreur ici, elle sera gérée par convertImageToBase64
+      throw error;
+    }
+  };
+
+  // Fonction pour convertir une image en base64 (version simplifiée)
+  const convertImageToBase64 = async (imageUrl: string, maxWidth: number = 300, quality: number = 0.8): Promise<string> => {
+    try {
+      return await convertImageToBase64WithTransparency(imageUrl, maxWidth, quality, false);
+      } catch (error) {
+      // Si c'est une erreur 404 ou de chargement d'image, on peut continuer sans l'image
+      if (error instanceof Error && (
+        error.message.includes('404') || 
+        error.message.includes('Unknown image download error') ||
+        error.message.includes('Resource not found') ||
+        error.message.includes('Could not load the image')
+      )) {
+        // Log silencieux pour les erreurs 404 attendues
+        console.log('⚠️ Image non trouvée (404):', imageUrl);
+        throw new Error(`Image non trouvée: ${imageUrl}`);
+      }
+      
+      // Log complet pour les autres erreurs
+      console.error('❌ Erreur lors de la conversion de l\'image en base64:', error);
+      throw error;
+    }
+  };
+
+
+  // Fonction pour générer la carte RECTO en utilisant le générateur
+  const generateCardRecto = async (member: any): Promise<string> => {
+    try {
+      // Convertir les images en base64
+      let logoBase64 = '';
+      let photoBase64 = '';
+      
+      try {
+        const { Image } = require('react-native');
+        const logoUri = Image.resolveAssetSource(require('../../assets/images/logo.png')).uri;
+        logoBase64 = await convertImageToBase64WithTransparency(logoUri, 150, 0.9, true);
+      } catch (error) {
+        console.log('⚠️ Logo non trouvé:', error);
+      }
+      
+      if (member.formulaire_actuel?.donnees_snapshot?.selfie_photo_url) {
+        try {
+          photoBase64 = await convertImageToBase64(member.formulaire_actuel.donnees_snapshot.selfie_photo_url, 200, 0.8);
+        } catch (error) {
+          console.log('Photo non trouvée');
+        }
+      }
+      
+      // Utiliser le générateur de carte recto
+      if (carteRectoGeneratorRef.current) {
+        console.log('🔄 Génération de la carte RECTO avec le générateur...');
+        console.log('Logo disponible:', logoBase64 ? 'Oui' : 'Non');
+        console.log('Photo disponible:', photoBase64 ? 'Oui' : 'Non');
+        
+        const pngBase64 = await carteRectoGeneratorRef.current.generatePNG(logoBase64, photoBase64);
+        console.log('✅ Carte RECTO générée avec succès');
+        return pngBase64;
+      } else {
+        throw new Error('Référence du générateur de carte recto non disponible');
+      }
+      
+    } catch (error) {
+      console.error('Erreur lors de la génération de la carte RECTO PNG:', error);
+      // Retourner une image de placeholder en base64 pour éviter l'erreur
+      return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+    }
+  };
+
+  // Fonction pour générer la carte VERSO en utilisant le générateur
+  const generateCardVerso = async (member: any, presidentSignatureUrl: string, finalFormUrl?: string): Promise<string> => {
+    try {
+      // Convertir les images en base64
+      let signatureBase64 = '';
+      
+      // Utiliser la signature du président récupérée via l'API
+      if (presidentSignatureUrl) {
+        try {
+          console.log('🖼️ Conversion de la signature du président en cours...', presidentSignatureUrl);
+          signatureBase64 = await convertImageToBase64(presidentSignatureUrl, 250, 0.9);
+          console.log('✅ Signature du président convertie avec succès, taille:', signatureBase64.length);
+        } catch (error) {
+          console.log('⚠️ Signature du président non trouvée, génération sans signature');
+          // Continuer sans la signature du président
+        }
+      }
+
+      // Utiliser le générateur de carte verso
+      if (carteVersoGeneratorRef.current) {
+        console.log('🔄 Génération de la carte VERSO avec le générateur...');
+        console.log('QR Code sera généré automatiquement à partir de:', finalFormUrl || member.formulaire_actuel?.url_image_formulaire);
+        console.log('Signature disponible:', signatureBase64 ? 'Oui' : 'Non');
+        
+        // Ne pas passer de QR code - il sera généré automatiquement par le générateur
+        const pngBase64 = await carteVersoGeneratorRef.current.generatePNG(undefined, signatureBase64, finalFormUrl);
+        console.log('✅ Carte VERSO générée avec succès');
+        return pngBase64;
+      } else {
+        throw new Error('Référence du générateur de carte verso non disponible');
+      }
+      
+    } catch (error) {
+      console.error('Erreur lors de la génération de la carte VERSO PNG:', error);
+      // Retourner une image de placeholder en base64 pour éviter l'erreur
+      return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+    }
+  };
+
+  // Fonction pour uploader l'image PNG vers Cloudinary avec signature Cloudinary signée
+  const uploadPNGToCloudinary = async (base64Image: string, publicId?: string): Promise<{ url: string; public_id: string }> => {
+    try {
+      // Validation de l'image base64 avant l'upload
+      if (!base64Image || base64Image.length === 0) {
+        throw new Error('L\'image base64 est vide ou invalide');
+      }      
+      
+      // L'image est déjà en base64, pas besoin de conversion
+      const base64String = base64Image;
+      
+      // Obtenir la signature Cloudinary signée
+      // Si on a un publicId, on doit inclure les paramètres d'overwrite dans la signature
+      const signatureParams: any = {
+        public_id: publicId,
+        folder: 'formulaires_adhesion',
+        resource_type: 'image',
+        format: 'png'
+      };
+      
+      // 1. Obtenir la signature Cloudinary via l'API
+      console.log('Obtention de la signature Cloudinary...');
+      const signatureResponse = await apiService.generateCloudinarySignature(signatureParams);
+      const { signature, timestamp, api_key, cloud_name, upload_preset } = signatureResponse;
+      console.log('Signature Cloudinary obtenue avec succès');
+      
+      // 2. Créer un FormData pour l'upload avec le preset signed
+      const formData = new FormData();
+      // Si un public_id est fourni, l'ajouter au FormData (Cloudinary écrasera automatiquement l'image existante)
+      if (publicId) {
+        formData.append('public_id', publicId);
+      }
+      formData.append('file', `data:image/png;base64,${base64String}`);
+      formData.append('upload_preset', upload_preset); // Utiliser le preset signed
+      formData.append('signature', signature);
+      formData.append('timestamp', timestamp.toString());
+      formData.append('api_key', api_key);
+
+      try {
+        const response = await fetch(`https://api.cloudinary.com/v1_1/${cloud_name}/image/upload`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text(); // Lire le corps de la réponse pour plus de détails
+          console.error('Réponse d\'erreur Cloudinary:', errorText);
+          throw new Error(`Erreur HTTP: ${response.status} ${response.statusText} - ${errorText}`);
+        }
+
+        const result = await response.json();
+        
+        if (result.secure_url && result.public_id) {
+          return {
+            url: result.secure_url,
+            public_id: result.public_id
+          };
+        } else {
+          throw new Error('Réponse invalide de Cloudinary: ' + JSON.stringify(result));
+        }
+      } catch (fetchError: any) {
+        if (fetchError.name === 'AbortError') {
+          throw new Error('Timeout: La requête vers Cloudinary a pris trop de temps (30s)');
+        }
+        throw fetchError;
+      }
+    } catch (error) {
+      console.error('Erreur détaillée Cloudinary:', error);
+      throw new Error(`Erreur lors de l'upload vers Cloudinary: ${error}`);
+    }
+  };
+
+  // Fonction pour régénérer le PNG avec le numéro d'adhésion et le réuploader (utilise la signature Cloudinary signée)
+  const regenerateAndReuploadPNG = async (adhesionData: any, presidentSignatureUrl: string, publicId: string, numeroAdhesion: string): Promise<string> => {
+    try {
+      // Créer une copie des données avec le numéro d'adhésion mis à jour
+      const adhesionDataWithNumber = {
+        ...adhesionData,
+        status: 'validated',
+        adhesionNumber: numeroAdhesion
+      };
+      
+      // Convertir les images en base64
+      let logoBase64 = '';
+      
+      try {
+        const { Image } = require('react-native');
+        const logoUri = Image.resolveAssetSource(require('../../assets/images/logo.png')).uri;
+        logoBase64 = await convertImageToBase64WithTransparency(logoUri, 150, 0.9, true);
+      } catch (error) {
+        console.log('⚠️ Logo non trouvé:', error);
+      }
+      
+      // Générer le nouveau PNG avec le numéro d'adhésion
+      console.log('🖼️ Génération du nouveau PNG avec numéro d\'adhésion...');
+      const pngBase64 = await adhesionFormGeneratorRef.current?.generatePNG(
+        logoBase64, 
+        adhesionDataWithNumber.selfie_photo_url, 
+        adhesionDataWithNumber.signature_url,
+        adhesionDataWithNumber,
+        presidentSignatureUrl
+      );
+      
+      if (!pngBase64) {
+        throw new Error('Impossible de générer le PNG');
+      }
+      
+      // Réuploader sur le même public_id avec overwrite (utilise la signature Cloudinary signée)
+      console.log('☁️ Réupload du PNG sur Cloudinary avec signature signée et overwrite...');
+      const result = await uploadPNGToCloudinary(pngBase64, publicId);
+      
+      console.log('✅ PNG régénéré et réuploadé avec succès:', result.url);
+      console.log('🏷️ Public ID Cloudinary final:', result.public_id);
+      return result.url;
+      
+    } catch (error) {
+      console.error('❌ Erreur lors de la régénération du PNG:', error);
+      throw new Error('Erreur lors de la régénération du PNG');
+    }
+  };
+
   const handleValidateAdhesion = async (id: number) => {
     try {
       setActionLoading(id);
+      console.log('✅ Récupération de la Signature du président');
       
-      console.log('✅ Validation de l\'adhésion:', id);
+      // Récupérer la signature du président
+      const presidentSignatureData = await apiService.getPresidentSignature();
+      const presidentSignatureUrl = presidentSignatureData.signature_url;
       
-      // Appeler l'API pour valider le formulaire
-      const result = await apiService.approveForm({
-        id_utilisateur: id
-      });
+      console.log('✅ Signature du président récupérée:', presidentSignatureUrl);
 
-      console.log('✅ Réponse API validation:', result);
+      // Récupérer les données complètes de l'adhésion
+      const adhesionDetails = await apiService.getAdhesionForms();
+      
+      // Trouver l'adhésion spécifique dans la liste
+      const specificAdhesion = adhesionDetails.donnees?.formulaires?.find(
+        (form: any) => form.id === id
+      ) || adhesionDetails.formulaires?.find(
+        (form: any) => form.id === id
+      );
 
-      // Mettre à jour la liste locale
-      const updatedAdhesions = adhesions.map(a => 
-        a.id === id ? { ...a, statut: 'APPROUVE' as const } : a
+      // Créer le public_id fixe basé sur l'ID de l'adhésion
+      const publicId = `adhesions/${id}`;
+      console.log('🏷️ Public ID fixe:', publicId);
+
+      // Convertir les images en base64
+      let logoBase64 = '';
+      
+      try {
+        const { Image } = require('react-native');
+        const logoUri = Image.resolveAssetSource(require('../../assets/images/logo.png')).uri;
+        logoBase64 = await convertImageToBase64WithTransparency(logoUri, 150, 0.9, true);
+      } catch (error) {
+        console.log('⚠️ Logo non trouvé:', error);
+      }
+
+      // Générer le PNG de la fiche d'adhésion avec la signature du président (sans numéro d'adhésion)
+      console.log('🖼️ Génération du PNG de la fiche d\'adhésion...', specificAdhesion.formulaire_actuel.donnees_snapshot);
+      const pngBase64 = await adhesionFormGeneratorRef.current?.generatePNG(
+        logoBase64,
+        specificAdhesion.formulaire_actuel.donnees_snapshot.selfie_photo_url, 
+        specificAdhesion.formulaire_actuel.donnees_snapshot.signature_url,
+        specificAdhesion.formulaire_actuel.donnees_snapshot,
+        presidentSignatureUrl
       );
       
-      setAdhesions(updatedAdhesions);
+      if (!pngBase64) {
+        throw new Error('Impossible de générer le PNG de la fiche d\'adhésion');
+      }
+      
+      // Uploader le PNG sur Cloudinary avec le public_id fixe (utilise la signature Cloudinary signée)
+      console.log('☁️ Upload du PNG sur Cloudinary avec signature signée et public_id fixe...');
+      const cloudinaryResult = await uploadPNGToCloudinary(pngBase64, publicId);
+      
+      console.log('✅ PNG uploadé sur Cloudinary:', cloudinaryResult);
+
+      // Maintenant que nous avons le numéro d'adhésion, générer les cartes RECTO et VERSO
+      console.log('🔄 Génération des cartes RECTO et VERSO avec le numéro d\'adhésion...');
+      
+      // Générer la carte RECTO
+      console.log('🖼️ Génération de la carte RECTO...');
+      const rectoBase64 = await generateCardRecto(specificAdhesion);
+      
+      // Uploader la carte RECTO sur Cloudinary avec public_id fixe
+      const rectoPublicId = `cartes_membres/${id}_recto`;
+      console.log('☁️ Upload de la carte RECTO sur Cloudinary...');
+      const rectoResult = await uploadPNGToCloudinary(rectoBase64, rectoPublicId);
+      console.log('✅ Carte RECTO uploadée:', rectoResult.url);
+      
+      // Générer la carte VERSO
+      console.log('🖼️ Génération de la carte VERSO...');
+      const versoBase64 = await generateCardVerso(specificAdhesion, presidentSignatureUrl, cloudinaryResult.url);
+      
+      // Uploader la carte VERSO sur Cloudinary avec public_id fixe
+      const versoPublicId = `cartes_membres/${id}_verso`;
+      console.log('☁️ Upload de la carte VERSO sur Cloudinary...');
+      const versoResult = await uploadPNGToCloudinary(versoBase64, versoPublicId);
+      console.log('✅ Carte VERSO uploadée:', versoResult.url);
+      
+      // Appeler l'API pour approuver le formulaire avec les URLs des cartes
+      // console.log('📋 Appel de l\'API pour approuver le formulaire...');
+      // const result = await apiService.approveForm({
+      //   id_utilisateur: id,
+      //   commentaire: 'Formulaire approuvé avec succès',
+      //   url_formulaire_final: cloudinaryResult.url,
+      //   carte_recto_url: rectoResult.url,
+      //   carte_verso_url: versoResult.url
+      // });
+      
+      // console.log('✅ Formulaire approuvé avec succès:', result);
+      
+      // Récupérer le numéro d'adhésion de la réponse
+      // const numeroAdhesion = result?.utilisateur?.numero_adhesion || result?.numero_adhesion;
+      // console.log('🏷️ Numéro d\'adhésion obtenu:', numeroAdhesion);
+      
+      // if (!numeroAdhesion) {
+      //   throw new Error('Numéro d\'adhésion non trouvé dans la réponse de l\'API');
+      // }
+      
+      // Maintenant que nous avons le numéro d'adhésion, régénérer le PNG et le réuploader
+      console.log('🔄 Régénération du PNG avec le numéro d\'adhésion...');
+      const finalUrl = await regenerateAndReuploadPNG(
+        specificAdhesion.formulaire_actuel.donnees_snapshot, 
+        presidentSignatureUrl, 
+        publicId,
+        "numeroAdhesion"
+      );
+
+      console.log('✅ PNG final avec numéro d\'adhésion:', finalUrl);
+      
+      // Maintenant que nous avons le numéro d'adhésion, régénérer les cartes RECTO et VERSO
+      console.log('🔄 Régénération des cartes RECTO et VERSO avec le numéro d\'adhésion...');
+      
+      // Régénérer la carte RECTO avec le numéro d'adhésion
+      console.log('🖼️ Régénération de la carte RECTO avec numéro d\'adhésion...');
+      const rectoBase64WithNumber = await generateCardRecto(specificAdhesion);
+      
+      // Réuploader la carte RECTO sur le même public_id avec overwrite
+      console.log('☁️ Réupload de la carte RECTO sur Cloudinary avec overwrite...');
+      const rectoResultWithNumber = await uploadPNGToCloudinary(rectoBase64WithNumber, rectoPublicId);
+      console.log('✅ Carte RECTO régénérée et réuploadée:', rectoResultWithNumber.url);
+      
+      // Régénérer la carte VERSO avec le numéro d'adhésion
+      console.log('🖼️ Régénération de la carte VERSO avec numéro d\'adhésion...');
+      const versoBase64WithNumber = await generateCardVerso(specificAdhesion, presidentSignatureUrl, cloudinaryResult.url);
+      
+      // Réuploader la carte VERSO sur le même public_id avec overwrite
+      console.log('☁️ Réupload de la carte VERSO sur Cloudinary avec overwrite...');
+      const versoResultWithNumber = await uploadPNGToCloudinary(versoBase64WithNumber, versoPublicId);
+      console.log('✅ Carte VERSO régénérée et réuploadée:', versoResultWithNumber.url);
+
+      console.log('✅ PNG final avec numéro d\'adhésion:', finalUrl);
+      console.log('✅ Cartes RECTO et VERSO régénérées et réuploadées avec succès !');
+
+      // Mettre à jour la liste locale
+      // const updatedAdhesions = adhesions.map((a: any) => 
+      //   a.id === id ? { ...a, statut: 'APPROUVE' as const } : a
+      // );
+      
+      // setAdhesions(updatedAdhesions);
       
       Alert.alert(
         'Succès',
@@ -243,8 +642,8 @@ export default function AdhesionsScreen() {
 
       console.log('❌ Réponse API rejet:', result);
 
-      // Mettre à jour la liste locale
-      const updatedAdhesions = adhesions.map(a => 
+      // Mettre à jour la liste locale des adhésions
+      const updatedAdhesions = adhesions.map((a: any) => 
         a.id === id ? { ...a, statut: 'REJETE' as const, raison_rejet: reason } : a
       );
       
@@ -750,6 +1149,27 @@ export default function AdhesionsScreen() {
            </TouchableWithoutFeedback>
           </KeyboardAvoidingView>
        </Modal>
+
+        {/* Composants générateurs (cachés) */}
+        {selectedAdhesion && (
+          <>
+            <AdhesionFormGenerator
+              ref={adhesionFormGeneratorRef}
+              adhesionData={selectedAdhesion}
+              onError={(error) => console.error('Erreur génération formulaire:', error)}
+            />
+            <CarteRectoGenerator
+              ref={carteRectoGeneratorRef}
+              member={selectedAdhesion}
+              onError={(error) => console.error('Erreur génération carte recto:', error)}
+            />
+            <CarteVersoGenerator
+              ref={carteVersoGeneratorRef}
+              member={selectedAdhesion}
+              onError={(error) => console.error('Erreur génération carte verso:', error)}
+            />
+          </>
+        )}
     </SafeAreaView>
   );
 }

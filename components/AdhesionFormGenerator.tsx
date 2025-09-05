@@ -13,7 +13,7 @@ interface AdhesionFormGeneratorProps {
 }
 
 export interface AdhesionFormGeneratorRef {
-  generatePNG: (logoBase64?: string, photoUrl?: string, signatureUrl?: string) => Promise<string>;
+  generatePNG: (logoBase64?: string, photoUrl?: string, signatureUrl?: string, customData?: any, presidentSignatureUrl?: string) => Promise<string>;
 }
 
 const AdhesionFormGenerator = forwardRef<AdhesionFormGeneratorRef, AdhesionFormGeneratorProps>(
@@ -21,17 +21,35 @@ const AdhesionFormGenerator = forwardRef<AdhesionFormGeneratorRef, AdhesionFormG
     const viewShotRef = useRef<ViewShot>(null);
     const webViewRef = useRef<WebView>(null);
 
-    console.log('logoImage', logoImage);
-    console.log('photoImage', photoImage);
-    console.log('signatureImage', signatureImage);
-
-         const generateHTML = (data: any, logoBase64?: string, photoUrl?: string, signatureUrl?: string) => {
+         const generateHTML = (data: any, logoBase64?: string, photoUrl?: string, signatureUrl?: string, presidentSignatureUrl?: string) => {
+       // Mapper les propriétés françaises vers les propriétés anglaises
+       const mappedData = {
+         firstName: data.prenoms || data.firstName,
+         lastName: data.nom || data.lastName,
+         birthDate: data.date_naissance || data.birthDate,
+         birthPlace: data.lieu_naissance || data.birthPlace,
+         address: data.adresse || data.address,
+         profession: data.profession || data.profession,
+         idNumber: data.numero_piece || data.idNumber,
+         idIssueDate: data.date_emission_piece || data.idIssueDate,
+         city: data.ville_residence || data.city,
+         entryDate: data.date_entree_congo || data.entryDate,
+         employer: data.employeur_ecole || data.employer,
+         phone: data.telephone || data.phone,
+         spouseName: data.nom_conjoint || data.spouseName,
+         childrenCount: data.nombre_enfants || data.childrenCount,
+         comment: data.commentaire || data.comment,
+         adhesionNumber: data.numero_adhesion || data.adhesionNumber,
+         status: data.statut || data.status,
+         idType: data.type_piece || data.idType,
+         ...data // Garder les autres propriétés existantes
+       };
        const htmlTemplate = `<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fiche d'Adhésion - ${data.firstName} ${data.lastName}</title>
+    <title>Fiche d'Adhésion - ${mappedData.firstName} ${mappedData.lastName}</title>
     <style>
         :root {
             --a4-width: 210mm;
@@ -292,9 +310,9 @@ const AdhesionFormGenerator = forwardRef<AdhesionFormGeneratorRef, AdhesionFormG
             </div>
 
             <!-- Numéro d'adhésion centré -->
-            ${data.status === 'validated' && data.adhesionNumber ? `
+            ${mappedData.status === 'validated' && mappedData.adhesionNumber ? `
             <div class="adhesion-number-center">
-                Numéro d'Adhésion : ${data.adhesionNumber}
+                Numéro d'Adhésion : ${mappedData.adhesionNumber}
             </div>
             ` : ''}
 
@@ -302,69 +320,69 @@ const AdhesionFormGenerator = forwardRef<AdhesionFormGeneratorRef, AdhesionFormG
             <div class="form-section">
                 <div class="form-field">
                     <span class="field-label">Nom(s) :</span>
-                    <span class="field-value">${data.lastName || ''}</span>
+                    <span class="field-value">${mappedData.lastName || ''}</span>
                 </div>
 
                 <div class="form-field">
                     <span class="field-label">Prénom(s) :</span>
-                    <span class="field-value">${data.firstName || ''}</span>
+                    <span class="field-value">${mappedData.firstName || ''}</span>
                 </div>
 
                 <div class="form-field">
                     <span class="field-label">Date et lieu de Naissance :</span>
-                    <span class="field-value">${data.birthDate || ''} ${data.birthPlace ? `à ${data.birthPlace}` : ''}</span>
+                    <span class="field-value">${mappedData.birthDate || ''} ${mappedData.birthPlace ? `à ${mappedData.birthPlace}` : ''}</span>
                 </div>
 
                 <div class="form-field">
                     <span class="field-label">Adresse :</span>
-                    <span class="field-value">${data.address || ''}</span>
+                    <span class="field-value">${mappedData.address || ''}</span>
                 </div>
 
                 <div class="form-field">
                     <span class="field-label">Profession :</span>
-                    <span class="field-value">${data.profession || ''}</span>
+                    <span class="field-value">${mappedData.profession || ''}</span>
                 </div>
 
                 <div class="form-field">
-                    <span class="field-label">N° de ${data.idType || 'Carte d\'identité consulaire'} :</span>
-                    <span class="field-value-inline">${data.idNumber || ''}</span>
+                    <span class="field-label">N° de ${mappedData.idType || 'Carte d\'identité consulaire'} :</span>
+                    <span class="field-value-inline">${mappedData.idNumber || ''}</span>
                     <span style="margin-left: 20px;font-weight: bold;">Délivré le :</span>
-                    <span class="field-value-inline">${data.idIssueDate || ''}</span>
+                    <span class="field-value-inline">${mappedData.idIssueDate || ''}</span>
                 </div>
 
                 <div class="form-field">
                     <span class="field-label">Ville de Résidence :</span>
-                    <span class="field-value">${data.city || ''}</span>
+                    <span class="field-value">${mappedData.city || ''}</span>
                 </div>
 
                 <div class="form-field">
                     <span class="field-label">Date d'entrée au Congo :</span>
-                    <span class="field-value">${data.entryDate || ''}</span>
+                    <span class="field-value">${mappedData.entryDate || ''}</span>
                 </div>
 
                 <div class="form-field">
                     <span class="field-label">Employeur / Université / École :</span>
-                    <span class="field-value">${data.employer || ''}</span>
+                    <span class="field-value">${mappedData.employer || ''}</span>
                 </div>
 
                 <div class="form-field">
                     <span class="field-label">Téléphone :</span>
-                    <span class="field-value">${data.phone || ''}</span>
+                    <span class="field-value">${mappedData.phone || ''}</span>
                 </div>
 
                 <div class="form-field">
                     <span class="field-label">Nom et Prénom du Conjoint(e) :</span>
-                    <span class="field-value">${data.spouseName || ''}</span>
+                    <span class="field-value">${mappedData.spouseName || ''}</span>
                 </div>
 
                 <div class="form-field">
                     <span class="field-label">Nombre d'enfant :</span>
-                    <span class="field-value">${data.childrenCount || ''}</span>
+                    <span class="field-value">${mappedData.childrenCount || ''}</span>
                 </div>
 
                 <div class="form-field">
                     <span class="field-label">Commentaire :</span>
-                    <span class="field-value">${data.comment || ''}</span>
+                    <span class="field-value">${mappedData.comment || ''}</span>
                 </div>
             </div>
 
@@ -378,6 +396,10 @@ const AdhesionFormGenerator = forwardRef<AdhesionFormGeneratorRef, AdhesionFormG
             <div class="signatures">
                 <div class="signature-box">
                     <div class="signature-label">Signature du Président(e)</div>
+                    ${presidentSignatureUrl ? 
+                        `<img src="${presidentSignatureUrl}" alt="Signature du Président" class="signature-image" />` : 
+                        `<div class="signature-space"></div>`
+                    }
                 </div>
                     <div class="signature-right">
                      <div class="signature-label">Signature de l'Adhérent(e)</div>
@@ -396,24 +418,29 @@ const AdhesionFormGenerator = forwardRef<AdhesionFormGeneratorRef, AdhesionFormG
        return htmlTemplate;
      };
 
-    const generatePNG = async (logoBase64?: string, photoUrl?: string, signatureUrl?: string): Promise<string> => {
+    const generatePNG = async (logoBase64?: string, photoUrl?: string, signatureUrl?: string, customData?: any, presidentSignatureUrl?: string): Promise<string> => {
       try {
         // Utiliser les paramètres fournis ou les props du composant
         const finalLogoBase64 = logoBase64 || logoImage;
         const finalPhotoUrl = photoUrl || photoImage;
         const finalSignatureUrl = signatureUrl || signatureImage;
         
+        // Utiliser les données personnalisées ou les données par défaut
+        const dataToUse = customData || adhesionData;
+        
         console.log('🔄 Début de la génération PNG avec images...');
         console.log('Logo:', finalLogoBase64 ? 'Présent' : 'Absent');
         console.log('Photo:', finalPhotoUrl ? 'Présente' : 'Absente');
-        console.log('Signature:', finalSignatureUrl ? 'Présente' : 'Absente');
+        console.log('Signature adhérent:', finalSignatureUrl ? 'Présente' : 'Absente');
+        console.log('Signature président:', presidentSignatureUrl ? 'Présente' : 'Absente');
+        console.log('Données utilisées:', dataToUse ? 'Personnalisées' : 'Par défaut');
         
         if (!viewShotRef.current) {
           throw new Error('ViewShot ref non disponible');
         }
 
         // Mettre à jour le HTML avec les images
-        const updatedHtmlContent = generateHTML(adhesionData, finalLogoBase64, finalPhotoUrl, finalSignatureUrl);
+        const updatedHtmlContent = generateHTML(dataToUse, finalLogoBase64, finalPhotoUrl, finalSignatureUrl, presidentSignatureUrl);
         
         // Mettre à jour le contenu du WebView
         if (webViewRef.current) {
