@@ -271,7 +271,7 @@ export default function AdhesionsScreen() {
       try {
         const { Image } = require('react-native');
         const logoUri = Image.resolveAssetSource(require('../../assets/images/logo.png')).uri;
-        logoBase64 = await convertImageToBase64WithTransparency(logoUri, 150, 0.9, true);
+        logoBase64 = await convertImageToBase64WithTransparency(logoUri, 200, 0.9, true);
       } catch (error) {
         console.log('⚠️ Logo non trouvé:', error);
       }
@@ -284,13 +284,21 @@ export default function AdhesionsScreen() {
         }
       }
       
+      // Ajouter le numéro d'adhésion à member pour l'affichage sur la carte
+      const memberWithNumber = {
+        ...member,
+        numero_adhesion: "AGC-2024-001" // Numéro d'adhésion par défaut
+      };
+      
+      console.log('🏷️ Numéro d\'adhésion ajouté à member:', memberWithNumber.numero_adhesion);
+      
       // Utiliser le générateur de carte recto
       if (carteRectoGeneratorRef.current) {
         console.log('🔄 Génération de la carte RECTO avec le générateur...');
         console.log('Logo disponible:', logoBase64 ? 'Oui' : 'Non');
         console.log('Photo disponible:', photoBase64 ? 'Oui' : 'Non');
         
-        const pngBase64 = await carteRectoGeneratorRef.current.generatePNG(logoBase64, photoBase64);
+        const pngBase64 = await carteRectoGeneratorRef.current.generatePNG(logoBase64, photoBase64, memberWithNumber.numero_adhesion);
         console.log('✅ Carte RECTO générée avec succès');
         return pngBase64;
       } else {
@@ -579,7 +587,16 @@ export default function AdhesionsScreen() {
       
       // Régénérer la carte RECTO avec le numéro d'adhésion
       console.log('🖼️ Régénération de la carte RECTO avec numéro d\'adhésion...');
-      const rectoBase64WithNumber = await generateCardRecto(specificAdhesion);
+      
+      // Ajouter le numéro d'adhésion à specificAdhesion pour l'affichage sur la carte
+      const specificAdhesionWithNumber = {
+        ...specificAdhesion,
+        numero_adhesion: "AGC-2024-001" // Numéro d'adhésion par défaut
+      };
+      
+      console.log('🏷️ Numéro d\'adhésion ajouté à specificAdhesion:', specificAdhesionWithNumber.numero_adhesion);
+      
+      const rectoBase64WithNumber = await generateCardRecto(specificAdhesionWithNumber);
       
       // Réuploader la carte RECTO sur le même public_id avec overwrite
       console.log('☁️ Réupload de la carte RECTO sur Cloudinary avec overwrite...');
@@ -588,7 +605,7 @@ export default function AdhesionsScreen() {
       
       // Régénérer la carte VERSO avec le numéro d'adhésion
       console.log('🖼️ Régénération de la carte VERSO avec numéro d\'adhésion...');
-      const versoBase64WithNumber = await generateCardVerso(specificAdhesion, presidentSignatureUrl, cloudinaryResult.url);
+      const versoBase64WithNumber = await generateCardVerso(specificAdhesionWithNumber, presidentSignatureUrl, cloudinaryResult.url);
       
       // Réuploader la carte VERSO sur le même public_id avec overwrite
       console.log('☁️ Réupload de la carte VERSO sur Cloudinary avec overwrite...');

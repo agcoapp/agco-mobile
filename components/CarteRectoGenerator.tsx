@@ -13,7 +13,7 @@ interface CarteRectoGeneratorProps {
 }
 
 export interface CarteRectoGeneratorRef {
-  generatePNG: (logoBase64?: string, photoUrl?: string) => Promise<string>;
+  generatePNG: (logoBase64?: string, photoUrl?: string, adhesionNumber?: string) => Promise<string>;
 }
 
 const CarteRectoGenerator = forwardRef<CarteRectoGeneratorRef, CarteRectoGeneratorProps>(
@@ -21,15 +21,12 @@ const CarteRectoGenerator = forwardRef<CarteRectoGeneratorRef, CarteRectoGenerat
     const viewShotRef = useRef<ViewShot>(null);
     const webViewRef = useRef<WebView>(null);
 
-    console.log('logoImage', logoImage);
-    console.log('photoImage', photoImage);
-
     const cleanCodeFormulaire = (code: string) => {
       if (!code) return 'Non spécifié';
       return code.replace(/[^a-zA-Z0-9]/g, '');
     };
 
-    const generateHTML = (memberData: any, logoBase64?: string, photoUrl?: string) => {
+    const generateHTML = (memberData: any, logoBase64?: string, photoUrl?: string, adhesionNumber?: string) => {
       const rectoHTML = `
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -66,11 +63,10 @@ const CarteRectoGenerator = forwardRef<CarteRectoGeneratorRef, CarteRectoGenerat
             </div>
 
             <!-- Logo de l'association -->
-            ${logoBase64 ? 
-              `<img src="${logoBase64}" alt="Logo AGC" style="position: absolute; top: 0; left: 15px; width: 120px; height: 100px; object-fit: contain;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
-               <div style="position: absolute; top: 0; left: 15px; width: 120px; height: 100px; background: transparent; border: none; display: none; align-items: center; justify-content: center; font-size: 12px; color: #666;">Logo AGC</div>` : 
-              `<div style="position: absolute; top: 0; left: 15px; width: 120px; height: 100px; background: transparent; border: none; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #666;">Logo AGC</div>`
-            }
+             ${logoBase64 ? 
+               `<img src="${logoBase64}" alt="Logo AGC" style="position: absolute; top: 0; left: 15px; width: 120px; height: 100px; object-fit: contain;" />` : 
+               `<div style="position: absolute; top: 0; left: 15px; width: 120px; height: 100px; background: transparent; border: none; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #666;">Logo AGC</div>`
+             }
           </div>
 
           <!-- Main Content Section -->
@@ -118,7 +114,7 @@ const CarteRectoGenerator = forwardRef<CarteRectoGeneratorRef, CarteRectoGenerat
               </div>
               <div style="margin-bottom: 3px;">
                 <span style="font-family: 'Inter'; font-weight: normal; color: black; font-size: 24px; letter-spacing: 0;">N° :</span>
-                <span style="font-family: 'Inter'; font-weight: bold; color: black; font-size: 24px;">${cleanCodeFormulaire(memberData.numero_adhesion)}</span>
+                <span style="font-family: 'Inter'; font-weight: bold; color: black; font-size: 24px;">${cleanCodeFormulaire(adhesionNumber || memberData.numero_adhesion)}</span>
               </div>
               <div style="margin-top: 5px;">
                 <span style="font-family: 'Inter'; font-weight: bold; color: black; font-size: 24px;">Fait à Brazzaville, le ${new Date().toLocaleDateString('fr-FR')}</span>
@@ -153,7 +149,7 @@ const CarteRectoGenerator = forwardRef<CarteRectoGeneratorRef, CarteRectoGenerat
 </html>`;
     };
 
-    const generatePNG = async (logoBase64?: string, photoUrl?: string): Promise<string> => {
+    const generatePNG = async (logoBase64?: string, photoUrl?: string, adhesionNumber?: string): Promise<string> => {
       try {
         // Utiliser les paramètres fournis ou les props du composant
         const finalLogoBase64 = logoBase64 || logoImage;
@@ -162,9 +158,10 @@ const CarteRectoGenerator = forwardRef<CarteRectoGeneratorRef, CarteRectoGenerat
         console.log('🔄 Début de la génération PNG Carte Recto avec images...');
         console.log('Logo:', finalLogoBase64 ? 'Présent' : 'Absent');
         console.log('Photo:', finalPhotoUrl ? 'Présente' : 'Absente');
+        console.log('Numéro d\'adhésion:', adhesionNumber ? 'Présent' : 'Absent');
 
         // Générer le HTML avec les images
-        const htmlContent = generateHTML(member, finalLogoBase64, finalPhotoUrl);
+        const htmlContent = generateHTML(member, finalLogoBase64, finalPhotoUrl, adhesionNumber);
         
         if (!viewShotRef.current) {
           throw new Error('ViewShot ref non disponible');
