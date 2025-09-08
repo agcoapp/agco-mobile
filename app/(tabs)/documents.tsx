@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -21,6 +22,7 @@ import {
 import { WebView } from 'react-native-webview';
 import { useAuth } from '../../hooks/useAuth';
 import { apiService } from '../../services/apiService';
+
 
 // Interface pour les documents
 interface Document {
@@ -48,8 +50,8 @@ export default function DocumentsScreen() {
     title: '',
     description: '',
     category: 'pv' as 'pv' | 'comptesRendus' | 'decisions' | 'reglement',
-    cloudinaryUrl: '',
-    cloudinaryId: '',
+    selectedFile: null as DocumentPicker.DocumentPickerAsset | null,
+    fileName: '',
     fileSize: 0
   });
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -220,6 +222,89 @@ export default function DocumentsScreen() {
     }
   };
 
+  // Fonction pour sélectionner un fichier PDF
+  const handleSelectPDF = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'application/pdf',
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const file = result.assets[0];
+        console.log('Fichier sélectionné:', file);
+        
+        // Stocker le fichier sélectionné sans l'uploader immédiatement
+        setUploadForm(prev => ({
+          ...prev,
+          selectedFile: file,
+          fileName: file.name || `document_${Date.now()}.pdf`,
+          fileSize: file.size || 0
+        }));
+        
+        setToastMessage('Fichier PDF sélectionné avec succès !');
+        setToastType('success');
+        setShowToast(true);
+      }
+    } catch (error) {
+      console.error('Erreur lors de la sélection du fichier:', error);
+      setToastMessage('Erreur lors de la sélection du fichier PDF');
+      setToastType('error');
+      setShowToast(true);
+    }
+  };
+
+  // Fonction pour uploader vers Cloudinary
+  const uploadToCloudinary = async (file: DocumentPicker.DocumentPickerAsset) => {
+    // Configuration Cloudinary
+    const cloudName = 'dtqxhyqtp'; // Votre cloud name Cloudinary
+    const uploadPreset = 'sgm_preset_textes_officiels'; // Votre upload preset
+    
+    // Créer le nom du fichier avec timestamp
+    const timestamp = Date.now();
+    const fileName = `texte_officiel_${uploadForm.category}_${timestamp}.pdf`;
+    
+    // URL d'upload Cloudinary
+    const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/upload`;
+    
+    // Préparer les données de l'upload
+    const formData = new FormData();
+    formData.append('file', {
+      uri: file.uri,
+      type: 'application/pdf',
+      name: fileName,
+    } as any);
+    formData.append('upload_preset', uploadPreset);
+    formData.append('public_id', `${uploadForm.category}/${fileName}`);
+    formData.append('resource_type', 'raw');
+    
+    console.log('Upload vers Cloudinary en cours...');
+    
+    // Effectuer l'upload
+    const response = await fetch(uploadUrl, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Erreur upload Cloudinary: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    console.log('Upload réussi:', result);
+    
+    // Retourner les données Cloudinary
+    return {
+      cloudinaryUrl: result.secure_url,
+      cloudinaryId: result.public_id,
+      fileSize: result.bytes || file.size || 0,
+      fileName: fileName
+    };
+  };
+
   // Fonction de formatage des dates avec heure
   const formatDateWithTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -294,8 +379,8 @@ export default function DocumentsScreen() {
       title: '',
       description: '',
       category: 'pv',
-      cloudinaryUrl: '',
-      cloudinaryId: '',
+      selectedFile: null,
+      fileName: '',
       fileSize: 0
     });
     setNewlyAddedDocument(null);
@@ -346,8 +431,8 @@ export default function DocumentsScreen() {
   };
 
   const handleUploadSubmit = async () => {
-    if (!uploadForm.title.trim() || !uploadForm.description.trim() || !uploadForm.cloudinaryUrl) {
-      setToastMessage('Veuillez remplir tous les champs et uploader un document PDF vers Cloudinary.');
+    if (!uploadForm.title.trim() || !uploadForm.description.trim() || !uploadForm.selectedFile) {
+      setToastMessage('Veuillez remplir tous les champs et sélectionner un fichier PDF.');
       setToastType('error');
       setShowToast(true);
       return;
@@ -355,16 +440,21 @@ export default function DocumentsScreen() {
 
     try {
       setIsUploading(true);
+      
+      // 1. D'abord uploader vers Cloudinary
+      const cloudinaryData = await uploadToCloudinary(uploadForm.selectedFile);
+      
+      // 2. Ensuite envoyer à l'API
       const newDocumentData = {
         titre: uploadForm.title,
         description: uploadForm.description,
         type_document: (uploadForm.category === 'pv' ? 'PV_REUNION' : 
                       uploadForm.category === 'comptesRendus' ? 'COMPTE_RENDU' :
                       uploadForm.category === 'decisions' ? 'DECISION' : 'REGLEMENT_INTERIEUR') as 'PV_REUNION' | 'COMPTE_RENDU' | 'DECISION' | 'REGLEMENT_INTERIEUR',
-        url_cloudinary: uploadForm.cloudinaryUrl,
-        cloudinary_id: uploadForm.cloudinaryId,
-        nom_fichier_original: `texte_officiel_${uploadForm.category}_${Date.now()}.pdf`,
-        taille_fichier: uploadForm.fileSize
+        url_cloudinary: cloudinaryData.cloudinaryUrl,
+        cloudinary_id: cloudinaryData.cloudinaryId,
+        nom_fichier_original: cloudinaryData.fileName,
+        taille_fichier: cloudinaryData.fileSize
       };
 
       await apiService.createTexteOfficiel(newDocumentData);
@@ -483,7 +573,7 @@ export default function DocumentsScreen() {
             >
               <Text style={[styles.tabText, tabValue === 3 && styles.activeTabText]}>
                 Règlement intérieur
-              </Text>
+          </Text>
             </TouchableOpacity>
           </View>
 
@@ -492,14 +582,14 @@ export default function DocumentsScreen() {
             {tabValue === 0 && (
               <View>
                 <Text style={styles.tabTitle}>
-                  PV de réunions ({documents.pv.length} texte officiel{documents.pv.length > 1 ? 's' : ''})
+                  PV de réunions ({documents.pv.length})
                 </Text>
                 <FlatList
                   data={filterDocuments(documents.pv)}
                   renderItem={({ item }) => (
                     <View style={[styles.documentItem, getListItemStyles(item.titre)]}>
                       <View style={styles.documentIcon}>
-                        <Ionicons name="document-outline" size={24} color="#007AFF" />
+              <Ionicons name="document-outline" size={24} color="#007AFF" />
                       </View>
                       <View style={styles.documentInfo}>
                         <Text style={styles.documentTitle}>{item.titre}</Text>
@@ -538,20 +628,20 @@ export default function DocumentsScreen() {
                     </Text>
                   </View>
                 )}
-              </View>
+            </View>
             )}
 
             {tabValue === 1 && (
               <View>
                 <Text style={styles.tabTitle}>
-                  Comptes rendus ({documents.comptesRendus.length} texte officiel{documents.comptesRendus.length > 1 ? 's' : ''})
+                  Comptes rendus ({documents.comptesRendus.length})
                 </Text>
                 <FlatList
                   data={filterDocuments(documents.comptesRendus)}
                   renderItem={({ item }) => (
                     <View style={[styles.documentItem, getListItemStyles(item.titre)]}>
                       <View style={styles.documentIcon}>
-                        <Ionicons name="newspaper-outline" size={24} color="#34C759" />
+              <Ionicons name="newspaper-outline" size={24} color="#34C759" />
                       </View>
                       <View style={styles.documentInfo}>
                         <Text style={styles.documentTitle}>{item.titre}</Text>
@@ -596,7 +686,7 @@ export default function DocumentsScreen() {
             {tabValue === 2 && (
               <View>
                 <Text style={styles.tabTitle}>
-                  Décisions ({documents.decisions.length} texte officiel{documents.decisions.length > 1 ? 's' : ''})
+                  Décisions ({documents.decisions.length})
                 </Text>
                 <FlatList
                   data={filterDocuments(documents.decisions)}
@@ -648,7 +738,7 @@ export default function DocumentsScreen() {
             {tabValue === 3 && (
               <View>
                 <Text style={styles.tabTitle}>
-                  Règlement intérieur ({documents.reglement ? 1 : 0} texte officiel)
+                  Règlement intérieur ({documents.reglement ? 1 : 0})
                 </Text>
                 {documents.reglement ? (
                   <FlatList
@@ -735,7 +825,7 @@ export default function DocumentsScreen() {
                     </View>
                   )}
                 />
-              </View>
+            </View>
             )}
             
             <View style={styles.pdfModalActions}>
@@ -748,8 +838,8 @@ export default function DocumentsScreen() {
                 <Text style={styles.pdfCloseButtonText}>Fermer</Text>
               </TouchableOpacity>
             </View>
+            </View>
           </View>
-        </View>
       </Modal>
 
       {/* Modal d'upload de document */}
@@ -812,19 +902,48 @@ export default function DocumentsScreen() {
                       Décisions
                     </Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
+          <TouchableOpacity
                     style={[styles.categoryButton, uploadForm.category === 'reglement' && styles.activeCategoryButton]}
                     onPress={() => setUploadForm(prev => ({ ...prev, category: 'reglement' }))}
-                  >
+          >
                     <Text style={[styles.categoryButtonText, uploadForm.category === 'reglement' && styles.activeCategoryButtonText]}>
                       Règlement intérieur
                     </Text>
-                  </TouchableOpacity>
-                </View>
-                <Text style={styles.uploadNote}>
-                  Note: L'upload vers Cloudinary sera implémenté dans une version future.
-                </Text>
-              </ScrollView>
+          </TouchableOpacity>
+                 </View>
+                 
+                 {/* Section d'upload de fichier PDF */}
+                 <Text style={styles.uploadSectionTitle}>Fichier PDF :</Text>
+                 <TouchableOpacity 
+                   style={[styles.uploadFileButton, uploadForm.selectedFile && styles.uploadFileButtonSuccess]} 
+                   onPress={handleSelectPDF}
+                   disabled={isUploading}
+                 >
+                   {isUploading ? (
+                     <ActivityIndicator size="small" color="white" />
+                   ) : (
+                     <Ionicons 
+                       name={uploadForm.selectedFile ? "checkmark-circle" : "cloud-upload-outline"} 
+                       size={20} 
+                       color="white" 
+                     />
+                   )}
+                   <Text style={styles.uploadFileButtonText}>
+                     {uploadForm.selectedFile 
+                       ? 'Fichier PDF sélectionné ✓' 
+                       : 'Sélectionner un fichier PDF'
+                     }
+                   </Text>
+                 </TouchableOpacity>
+                 
+                 {uploadForm.selectedFile && (
+                   <View style={styles.uploadSuccessInfo}>
+                     <Text style={styles.uploadSuccessText}>
+                       ✓ Fichier sélectionné : {uploadForm.fileName}
+                     </Text>
+                   </View>
+                 )}
+      </ScrollView>
               <View style={styles.modalActions}>
                 <TouchableOpacity 
                   style={styles.cancelButton} 
@@ -833,11 +952,11 @@ export default function DocumentsScreen() {
                 >
                   <Text style={styles.cancelButtonText}>Annuler</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.submitButton, (!uploadForm.title.trim() || !uploadForm.description.trim() || isUploading) && styles.disabledButton]} 
-                  onPress={handleUploadSubmit}
-                  disabled={!uploadForm.title.trim() || !uploadForm.description.trim() || isUploading}
-                >
+                 <TouchableOpacity 
+                   style={[styles.submitButton, (!uploadForm.title.trim() || !uploadForm.description.trim() || !uploadForm.selectedFile || isUploading) && styles.disabledButton]} 
+                   onPress={handleUploadSubmit}
+                   disabled={!uploadForm.title.trim() || !uploadForm.description.trim() || !uploadForm.selectedFile || isUploading}
+                 >
                   {isUploading ? (
                     <ActivityIndicator size="small" color="white" />
                   ) : (
@@ -1252,11 +1371,49 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: '600',
   },
-  uploadNote: {
+  uploadSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+    marginTop: 8,
+  },
+  uploadFileButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#007AFF',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  uploadFileButtonSuccess: {
+    backgroundColor: '#34C759',
+  },
+  uploadFileButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  uploadSuccessInfo: {
+    backgroundColor: '#E8F5E8',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#34C759',
+  },
+  uploadSuccessText: {
+    fontSize: 14,
+    color: '#34C759',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  uploadSuccessUrl: {
     fontSize: 12,
-    color: '#999',
-    fontStyle: 'italic',
-    textAlign: 'center',
+    color: '#666',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
   toast: {
     position: 'absolute',
