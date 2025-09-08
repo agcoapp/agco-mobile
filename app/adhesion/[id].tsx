@@ -5,15 +5,15 @@ import { router, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Image,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { useAuth } from '../../hooks/useAuth';
 import { apiService } from '../../services/apiService';
@@ -137,11 +137,11 @@ export default function AdhesionDetailsScreen() {
       'Comment souhaitez-vous télécharger la fiche d\'adhésion ?',
       [
         {
-          text: 'PNG (Galerie)',
+          text: 'PNG',
           onPress: () => downloadAsPNG()
         },
         {
-          text: 'PDF (Fichiers)',
+          text: 'PDF',
           onPress: () => downloadAsPDF()
         },
         {

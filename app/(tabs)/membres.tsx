@@ -5,14 +5,17 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  TouchableWithoutFeedback,
+  View
 } from 'react-native';
 import { useAuth } from '../../hooks/useAuth';
 import { apiService } from '../../services/apiService';
@@ -72,6 +75,17 @@ export default function MembresScreen() {
   const [showRemovalModal, setShowRemovalModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState<AdhesionFormMember | null>(null);
   const [removalReason, setRemovalReason] = useState('');
+  const [selectedRemovalReason, setSelectedRemovalReason] = useState('');
+  const [showRemovalReasonPicker, setShowRemovalReasonPicker] = useState(false);
+
+  // Raisons de retrait prédéfinies
+  const PREDEFINED_REASONS = [
+    'Démission volontaire',
+    'Non-respect du règlement intérieur',
+    'Comportement inapproprié',
+    'Décès',
+    'Autre'
+  ];
   const [isProcessingRemoval, setIsProcessingRemoval] = useState(false);
 
   // Charger les membres
@@ -112,7 +126,6 @@ export default function MembresScreen() {
             est_actif: apiMember.est_actif !== undefined ? apiMember.est_actif : apiMember.statut === 'APPROUVE',
             formulaire_actuel: apiMember.formulaire_actuel
           }));
-          
           setMembers(convertedMembers);
         } else {
           // Pour les membres, charger le répertoire des membres
@@ -258,6 +271,8 @@ export default function MembresScreen() {
       setShowRemovalModal(false);
       setSelectedMember(null);
       setRemovalReason('');
+      setSelectedRemovalReason('');
+      setShowRemovalReasonPicker(false);
     } catch (error) {
       console.error('Erreur lors du retrait du membre:', error);
       Alert.alert('Erreur', 'Erreur lors du retrait du membre');
@@ -267,7 +282,10 @@ export default function MembresScreen() {
   };
 
   const handleViewMember = (member: AdhesionFormMember) => {
-    router.push('/(tabs)/adhesions');
+    router.navigate({
+      pathname: '/adhesion/[id]',
+      params: { id: member.id.toString() }
+    });
   };
 
   const handleGenerateCard = (member: AdhesionFormMember) => {
@@ -409,6 +427,7 @@ export default function MembresScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <View style={styles.content}>
         {/* Bouton de retour */}
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -477,6 +496,7 @@ export default function MembresScreen() {
           )}
         </View>
       </View>
+      </TouchableWithoutFeedback>
 
       {/* Modal de confirmation de retrait */}
       <Modal
@@ -485,14 +505,72 @@ export default function MembresScreen() {
         animationType="slide"
         onRequestClose={() => setShowRemovalModal(false)}
       >
-        <View style={styles.modalOverlay}>
-          <ScrollView style={styles.modalContent}>
+        <KeyboardAvoidingView 
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Confirmer le retrait</Text>
             <Text style={styles.modalText}>
               Êtes-vous sûr de vouloir retirer le membre {selectedMember?.nom_complet} ?
             </Text>
             
             <Text style={styles.modalLabel}>Raison du retrait *</Text>
+              
+              {/* Menu déroulant pour les raisons prédéfinies */}
+              <TouchableOpacity
+                style={styles.pickerContainer}
+                onPress={() => setShowRemovalReasonPicker(!showRemovalReasonPicker)}
+              >
+                <Text style={[
+                  styles.pickerText,
+                  !selectedRemovalReason && styles.pickerPlaceholder
+                ]}>
+                  {selectedRemovalReason || 'Sélectionnez une raison'}
+                </Text>
+                <Ionicons 
+                  name={showRemovalReasonPicker ? "chevron-up" : "chevron-down"} 
+                  size={20} 
+                  color="#666" 
+                />
+              </TouchableOpacity>
+              
+              {/* Liste déroulante des raisons */}
+              {showRemovalReasonPicker && (
+                <View style={styles.pickerDropdown}>
+                  {PREDEFINED_REASONS.map((reason, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={[
+                        styles.pickerOption,
+                        selectedRemovalReason === reason && styles.pickerOptionSelected
+                      ]}
+                      onPress={() => {
+                        setSelectedRemovalReason(reason);
+                        setShowRemovalReasonPicker(false);
+                        // Si "Autre" est sélectionné, on garde le champ texte vide pour saisie manuelle
+                        if (reason === 'Autre') {
+                          setRemovalReason('');
+                        } else {
+                          setRemovalReason(reason);
+                        }
+                      }}
+                    >
+                      <Text style={[
+                        styles.pickerOptionText,
+                        selectedRemovalReason === reason && styles.pickerOptionTextSelected
+                      ]}>
+                        {reason}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+              
+              {/* Champ texte pour saisie manuelle (visible seulement si "Autre" est sélectionné) */}
+              {selectedRemovalReason === 'Autre' && (
             <TextInput
               style={styles.reasonInput}
               placeholder="Entrez la raison du retrait..."
@@ -501,6 +579,7 @@ export default function MembresScreen() {
               multiline
               numberOfLines={3}
             />
+              )}
             
             <View style={styles.modalActions}>
               <TouchableOpacity
@@ -509,6 +588,8 @@ export default function MembresScreen() {
                   setShowRemovalModal(false);
                   setSelectedMember(null);
                   setRemovalReason('');
+                    setSelectedRemovalReason('');
+                    setShowRemovalReasonPicker(false);
                 }}
                 disabled={isProcessingRemoval}
               >
@@ -517,7 +598,11 @@ export default function MembresScreen() {
               <TouchableOpacity
                 style={[styles.modalButton, styles.removeButton]}
                 onPress={handleConfirmRemoval}
-                disabled={!removalReason.trim() || isProcessingRemoval}
+                  disabled={
+                    !selectedRemovalReason || 
+                    (selectedRemovalReason === 'Autre' && !removalReason.trim()) ||
+                    isProcessingRemoval
+                  }
               >
                 {isProcessingRemoval ? (
                   <ActivityIndicator size={16} color="white" />
@@ -526,8 +611,9 @@ export default function MembresScreen() {
                 )}
               </TouchableOpacity>
             </View>
-          </ScrollView>
         </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -755,7 +841,8 @@ const styles = StyleSheet.create({
      padding: 24,
      margin: 20,
      maxWidth: '90%',
-     maxHeight: '80%',
+    width: '90%',
+    maxHeight: '85%',
    },
    modalTitle: {
      fontSize: 20,
@@ -815,4 +902,52 @@ const styles = StyleSheet.create({
      fontWeight: '600',
      color: 'white',
    },
+  // Styles pour le picker de raisons (identique au modal de rejet)
+  pickerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E1E1E1',
+    borderRadius: 8,
+    backgroundColor: 'white',
+    marginBottom: 20,
+  },
+  pickerText: {
+    fontSize: 16,
+    color: '#333',
+    flex: 1,
+  },
+  pickerPlaceholder: {
+    color: '#999',
+  },
+  pickerDropdown: {
+    backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: '#E1E1E1',
+    borderRadius: 8,
+    marginBottom: 20,
+    maxHeight: 300,
+  },
+  pickerOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  pickerOptionText: {
+    fontSize: 14,
+    color: '#333',
+    flex: 1,
+  },
+  pickerOptionSelected: {
+    backgroundColor: '#F0F8FF',
+  },
+  pickerOptionTextSelected: {
+    color: '#007AFF',
+    fontWeight: '600',
+  },
 });
