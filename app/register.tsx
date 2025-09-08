@@ -189,13 +189,30 @@ export default function RegisterScreen() {
   }, [user]);
 
   const handleLogout = async () => {
-    try {
-      await apiService.logout();
-      router.replace('/login');
-    } catch (error) {
-      console.error('Erreur lors de la déconnexion:', error);
-      router.replace('/login');
-    }
+    Alert.alert(
+      'Déconnexion',
+      'Êtes-vous sûr de vouloir vous déconnecter ?',
+      [
+        {
+          text: 'Annuler',
+          style: 'cancel',
+        },
+        {
+          text: 'Déconnexion',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await apiService.logout();
+              router.replace('/login');
+            } catch (error) {
+              console.error('Erreur lors de la déconnexion:', error);
+              router.replace('/login');
+            }
+          },
+        },
+      ],
+      { cancelable: true }
+    );
   };
 
   // Fonction pour convertir une image en base64 avec optimisation

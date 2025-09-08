@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
+  RefreshControl,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -53,6 +54,7 @@ export default function AdhesionsScreen() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [selectedReason, setSelectedReason] = useState('');
   const [showReasonPicker, setShowReasonPicker] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Références aux générateurs
   const adhesionFormGeneratorRef = useRef<AdhesionFormGeneratorRef>(null);
@@ -70,6 +72,11 @@ export default function AdhesionsScreen() {
   // Charger les formulaires d'adhésion
   useEffect(() => {
     const loadAdhesionForms = async () => {
+      // Ne pas charger les adhésions si l'utilisateur n'est pas connecté
+      if (!user) {
+        return;
+      }
+      
       try {
         setLoading(true);
         setError(null);
@@ -138,7 +145,58 @@ export default function AdhesionsScreen() {
 
     // Appeler la fonction de chargement
     loadAdhesionForms();
-  }, []);
+  }, [user]);
+
+  const onRefresh = async () => {
+    // Ne pas rafraîchir si l'utilisateur n'est pas connecté
+    if (!user) {
+      setRefreshing(false);
+      return;
+    }
+    
+    setRefreshing(true);
+    try {
+      setError(null);
+      // Ne pas vider la liste pendant le refresh pour éviter l'affichage "Aucune adhésion trouvée"
+      
+      const data = await apiService.getAdhesionForms();
+      console.log("📊 Données reçues de l'API (refresh):", data);
+      
+      // Traiter la structure spécifique de l'API avec plus de sécurité
+      let processedData: any[] = [];
+      
+      if (data && typeof data === 'object') {
+        if (data.donnees && data.donnees.formulaires && Array.isArray(data.donnees.formulaires)) {
+          processedData = data.donnees.formulaires;
+        } else if (Array.isArray(data)) {
+          processedData = data;
+        } else if (data.formulaires && Array.isArray(data.formulaires)) {
+          processedData = data.formulaires;
+        }
+      }
+      
+      // Validation supplémentaire des données
+      if (Array.isArray(processedData)) {
+        const validData = processedData.filter(item => 
+          item && typeof item === 'object' && item.id !== undefined
+        );
+        processedData = validData;
+      }
+      
+      console.log(`📋 ${processedData.length} adhésions rechargées avec succès`);
+      setAdhesions(processedData);
+      
+    } catch (error) {
+      console.error('❌ Erreur lors du rafraîchissement des formulaires d\'adhésion:', error);
+      if (error instanceof Error) {
+        setError(`Erreur lors du rafraîchissement: ${error.message}`);
+      } else {
+        setError('Erreur inconnue lors du rafraîchissement');
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // Compter les adhésions par statut de manière sécurisée
   const getTabCount = (status: 'EN_ATTENTE' | 'APPROUVE' | 'REJETE') => {
@@ -949,6 +1007,9 @@ export default function AdhesionsScreen() {
               ) : (
                 <FlatList
                   data={getFilteredAdhesions('EN_ATTENTE')}
+                  refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                  }
                   renderItem={renderAdhesionItem}
                   keyExtractor={(item) => item.id.toString()}
                   showsVerticalScrollIndicator={false}
@@ -971,6 +1032,9 @@ export default function AdhesionsScreen() {
               ) : (
                 <FlatList
                   data={getFilteredAdhesions('APPROUVE')}
+                  refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                  }
                   renderItem={renderAdhesionItem}
                   keyExtractor={(item) => item.id.toString()}
                   showsVerticalScrollIndicator={false}
@@ -993,6 +1057,9 @@ export default function AdhesionsScreen() {
               ) : (
                 <FlatList
                   data={getFilteredAdhesions('REJETE')}
+                  refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                  }
                   renderItem={renderAdhesionItem}
                   keyExtractor={(item) => item.id.toString()}
                   showsVerticalScrollIndicator={false}

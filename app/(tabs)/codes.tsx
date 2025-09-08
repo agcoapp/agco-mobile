@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
+  RefreshControl,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -37,6 +38,7 @@ export default function CodesScreen() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [codeToDelete, setCodeToDelete] = useState<UtilisateurCredentials | null>(null);
   const [isDeletingCode, setIsDeletingCode] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const loadCodes = useCallback(async (showLoading = true) => {
     try {
@@ -62,6 +64,30 @@ export default function CodesScreen() {
       if (showLoading) {
         setLoading(false);
       }
+    }
+  }, [user]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      // Vérifier que l'utilisateur est authentifié
+      if (!user || !user.role) {
+        console.log('Utilisateur non authentifié, attente...');
+        return;
+      }
+
+      // Récupérer les données depuis l'API via apiService
+      const response = await apiService.getNouveauxUtilisateursCredentials();
+      console.log('📊 Codes rechargés:', response.donnees.utilisateurs);
+      setCodes(response.donnees.utilisateurs);
+      console.log(`📋 ${response.donnees.utilisateurs.length} codes rechargés avec succès`);
+    } catch (error) {
+      console.error('Erreur lors du rafraîchissement des codes:', error);
+      setToastMessage(error instanceof Error ? error.message : 'Erreur lors du rafraîchissement des données');
+      setToastType('error');
+      setShowToast(true);
+    } finally {
+      setRefreshing(false);
     }
   }, [user]);
 
@@ -355,14 +381,27 @@ export default function CodesScreen() {
         )}
       </View>
 
-      <FlatList
-        data={codes}
-        renderItem={renderCodeItem}
-        keyExtractor={(item) => item.id.toString()}
-        style={styles.list}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-      />
+      {codes.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="key-outline" size={64} color="#8E8E93" />
+          <Text style={styles.emptyTitle}>Aucun code d'accès</Text>
+          <Text style={styles.emptyText}>
+            Il n'y a actuellement aucun code d'accès temporaire généré.
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={codes}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          renderItem={renderCodeItem}
+          keyExtractor={(item) => item.id.toString()}
+          style={styles.list}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
 
       {/* Modal de création */}
       <Modal
@@ -820,5 +859,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     flex: 1,
     marginLeft: 8,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingVertical: 60,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 24,
   },
 });

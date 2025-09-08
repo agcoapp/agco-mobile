@@ -11,6 +11,7 @@ import {
   FlatList,
   Image,
   Modal,
+  RefreshControl,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -51,6 +52,7 @@ export default function CartesScreen() {
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const loadApprovedMembers = useCallback(async () => {
     try {
@@ -74,6 +76,24 @@ export default function CartesScreen() {
       loadApprovedMembers();
     }
   }, [user, loadApprovedMembers]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      // Récupérer les cartes de membres via l'API
+      const response = await apiService.getMemberCards();
+      const allMembers = response.cartes || [];
+      // Filtrer pour exclure les membres avec numero_adhesion null
+      const filteredMembers = allMembers.filter((member: ApprovedMember) => member.numero_adhesion !== null);
+      setApprovedMembers(filteredMembers);
+      console.log(`📋 ${filteredMembers.length} cartes rechargées avec succès`);
+    } catch (error) {
+      console.error('Erreur lors du rafraîchissement des cartes de membres:', error);
+      setMessage({ type: 'error', text: 'Erreur lors du rafraîchissement des cartes' });
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
 
   // Filtrer les membres selon le terme de recherche
   const getFilteredMembers = () => {
@@ -805,6 +825,9 @@ export default function CartesScreen() {
 
       <FlatList
         data={filteredMembers}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
         renderItem={renderMemberCard}
         keyExtractor={(item) => item.id.toString()}
         style={styles.list}

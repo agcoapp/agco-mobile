@@ -173,7 +173,24 @@ export default function TabLayout() {
         { 
           text: 'Déconnexion', 
           style: 'destructive',
-          onPress: () => logout()
+          onPress: () => {
+            Alert.alert(
+              'Déconnexion',
+              'Êtes-vous sûr de vouloir vous déconnecter ?',
+              [
+                {
+                  text: 'Annuler',
+                  style: 'cancel',
+                },
+                {
+                  text: 'Déconnexion',
+                  style: 'destructive',
+                  onPress: () => logout(),
+                },
+              ],
+              { cancelable: true }
+            );
+          }
         }
       ]
     );

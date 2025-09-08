@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
+  RefreshControl,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -87,10 +88,16 @@ export default function MembresScreen() {
     'Autre'
   ];
   const [isProcessingRemoval, setIsProcessingRemoval] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Charger les membres
   useEffect(() => {
     const loadMembers = async () => {
+      // Ne pas charger les membres si l'utilisateur n'est pas connecté
+      if (!user) {
+        return;
+      }
+      
       setLoading(true);
       try {
         // Charger les formulaires d'adhésion pour les admins
@@ -198,7 +205,99 @@ export default function MembresScreen() {
     };
 
     loadMembers();
-  }, [user?.role]);
+  }, [user, user?.role]);
+
+  const onRefresh = async () => {
+    // Ne pas rafraîchir si l'utilisateur n'est pas connecté
+    if (!user) {
+      setRefreshing(false);
+      return;
+    }
+    
+    setRefreshing(true);
+    try {
+      // Charger les formulaires d'adhésion pour les admins
+      if (user?.role === 'PRESIDENT' || user?.role === 'SECRETAIRE_GENERALE') {
+        const data = await apiService.getAdhesionForms();
+        console.log("📊 Données reçues de l'API (refresh):", data);
+        
+        let processedData: any[] = [];
+        
+        if (data && typeof data === 'object') {
+          if (data.donnees && data.donnees.formulaires && Array.isArray(data.donnees.formulaires)) {
+            processedData = data.donnees.formulaires;
+          } else if (Array.isArray(data)) {
+            processedData = data;
+          } else if (data.formulaires && Array.isArray(data.formulaires)) {
+            processedData = data.formulaires;
+          }
+        }
+        
+        // Convertir vers notre interface
+        const convertedMembers: AdhesionFormMember[] = processedData.map((apiMember: any) => ({
+          id: apiMember.id,
+          nom_complet: apiMember.nom_complet || 'Nom non disponible',
+          email: apiMember.email,
+          telephone: apiMember.telephone || '',
+          statut: apiMember.statut || 'EN_ATTENTE',
+          code_formulaire: apiMember.code_formulaire || '',
+          numero_adhesion: apiMember.numero_adhesion || '',
+          soumis_le: apiMember.soumis_le || '',
+          raison_rejet: apiMember.raison_rejet || null,
+          rejete_le: apiMember.rejete_le || null,
+          rejete_par: apiMember.rejete_par || null,
+          approuve_le: apiMember.approuve_le || null,
+          approuve_par: apiMember.approuve_par || null,
+          est_actif: apiMember.statut === 'APPROUVE',
+          formulaire_actuel: apiMember.formulaire_actuel || null
+        }));
+        
+        setMembers(convertedMembers);
+      } else {
+        // Charger les membres pour les autres rôles
+        const memberData = await apiService.getMembers();
+        console.log("📊 Données membres reçues de l'API (refresh):", memberData);
+        
+        let processedMemberData: any[] = [];
+        
+        if (memberData && typeof memberData === 'object') {
+          if (memberData.membres && Array.isArray(memberData.membres)) {
+            processedMemberData = memberData.membres;
+          } else if (Array.isArray(memberData)) {
+            processedMemberData = memberData;
+          }
+        }
+        
+        // Convertir vers notre interface
+        const convertedMembers: AdhesionFormMember[] = processedMemberData.map((apiMember: any) => ({
+          id: apiMember.id,
+          nom_complet: apiMember.nom_complet || 'Nom non disponible',
+          email: apiMember.email === 'Non renseigné' ? null : apiMember.email,
+          telephone: apiMember.telephone || '',
+          statut: apiMember.statut || 'EN_ATTENTE',
+          code_formulaire: apiMember.numero_adhesion || '',
+          numero_adhesion: apiMember.numero_adhesion || '',
+          soumis_le: '',
+          raison_rejet: null,
+          rejete_le: null,
+          rejete_par: null,
+          approuve_le: null,
+          approuve_par: null,
+          est_actif: apiMember.est_actif !== false,
+          formulaire_actuel: null
+        }));
+        
+        setMembers(convertedMembers);
+      }
+      
+      console.log(`📋 ${members.length} membres rechargés avec succès`);
+    } catch (error) {
+      console.error('❌ Erreur lors du rafraîchissement des membres:', error);
+      Alert.alert('Erreur', 'Erreur lors du rafraîchissement des membres');
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // Filtrer les membres selon l'onglet actif
   const getFilteredMembers = () => {
@@ -488,6 +587,9 @@ export default function MembresScreen() {
           ) : (
             <FlatList
               data={searchedMembers}
+              refreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+              }
               renderItem={renderMemberItem}
               keyExtractor={(item) => item.id.toString()}
               showsVerticalScrollIndicator={false}

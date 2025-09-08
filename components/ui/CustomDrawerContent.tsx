@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { DrawerContentScrollView, DrawerItemList } from '@react-navigation/drawer';
 import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../hooks/useAuth';
 
 interface CustomDrawerContentProps {
@@ -14,7 +14,22 @@ export default function CustomDrawerContent(props: CustomDrawerContentProps) {
   const { logout } = useAuth();
 
   const handleLogout = () => {
-    logout();
+    Alert.alert(
+      'Déconnexion',
+      'Êtes-vous sûr de vouloir vous déconnecter ?',
+      [
+        {
+          text: 'Annuler',
+          style: 'cancel',
+        },
+        {
+          text: 'Déconnexion',
+          style: 'destructive',
+          onPress: () => logout(),
+        },
+      ],
+      { cancelable: true }
+    );
   };
 
   return (

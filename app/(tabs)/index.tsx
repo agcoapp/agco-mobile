@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  RefreshControl,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -38,9 +39,16 @@ export default function DashboardScreen() {
   const [error, setError] = useState<string | null>(null);
   const [memberCardImages, setMemberCardImages] = useState<MemberCardImages>({ recto: '', verso: '' });
   const [isLoadingCard, setIsLoadingCard] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     const loadStats = async () => {
+      // Ne pas charger les statistiques du secrétaire si l'utilisateur est un membre
+      if (user?.role === 'MEMBRE') {
+        setIsLoading(false);
+        return;
+      }
+      
       try {
         setIsLoading(true);
         setError(null);
@@ -64,7 +72,38 @@ export default function DashboardScreen() {
     };
 
     loadStats();
-  }, []);
+  }, [user]);
+
+  const onRefresh = async () => {
+    // Ne pas rafraîchir les statistiques du secrétaire si l'utilisateur est un membre
+    if (user?.role === 'MEMBRE') {
+      setRefreshing(false);
+      return;
+    }
+    
+    setRefreshing(true);
+    try {
+      setError(null);
+      
+      // Récupérer les statistiques du tableau de bord via l'API
+      const dashboardData = await apiService.getSecretaryDashboard();
+      console.log('Dashboard data (refresh):', dashboardData);
+      
+      setStats({
+        totalMembers: dashboardData.donnees.statistiques.membres_approuves,
+        pendingAdhesions: dashboardData.donnees.statistiques.membres_en_attente,
+        validatedAdhesions: dashboardData.donnees.statistiques.membres_approuves,
+        rejectedAdhesions: dashboardData.donnees.statistiques.membres_rejetes,
+      });
+      
+      console.log('📋 Statistiques rechargées avec succès');
+    } catch (error) {
+      console.error('Erreur lors du rafraîchissement des statistiques:', error);
+      setError('Erreur lors du rafraîchissement des statistiques');
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // Charger les images de la carte de membre depuis userStatus
   useEffect(() => {
@@ -110,7 +149,12 @@ export default function DashboardScreen() {
   if (user?.role === 'MEMBRE') {
     return (
       <SafeAreaView style={styles.container}>
-        <ScrollView style={styles.scrollView}>
+        <ScrollView 
+          style={styles.scrollView}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
           <View style={styles.content}>
             {/* En-tête de bienvenue */}
             <View style={styles.welcomeSection}>
@@ -178,7 +222,6 @@ export default function DashboardScreen() {
             {/* Actions rapides */}
             <View style={styles.actionsSection}>
               <Text style={styles.sectionTitle}>Actions Rapides</Text>
-              
               <View style={styles.actionsGrid}>
                 <TouchableOpacity
                   style={styles.actionCard}
@@ -257,7 +300,12 @@ export default function DashboardScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
+      <ScrollView 
+        style={styles.scrollView}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         <View style={styles.content}>
           <Text style={styles.mainTitle}>Tableau De Bord</Text>
           
@@ -529,14 +577,15 @@ const styles = StyleSheet.create({
   actionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    gap: 12,
   },
   actionCard: {
     backgroundColor: 'white',
     borderRadius: 12,
     padding: 20,
     alignItems: 'center',
-    width: '48%',
+    width: '45%',
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },

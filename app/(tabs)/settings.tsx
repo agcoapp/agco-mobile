@@ -6,6 +6,7 @@ import {
   Alert,
   Image,
   Keyboard,
+  RefreshControl,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -37,6 +38,7 @@ export default function SettingsScreen() {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
+  const [refreshing, setRefreshing] = useState(false);
 
   // Charger la signature existante au montage du composant
   useEffect(() => {
@@ -255,10 +257,44 @@ export default function SettingsScreen() {
     setShowToast(false);
   };
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      // Recharger la signature existante
+      const signatureData = await apiService.getPresidentSignature();
+      
+      if (signatureData && signatureData.signature_url) {
+        setSettings(prev => ({
+          ...prev,
+          presidentSignature: signatureData.signature_url,
+          cloudinaryUrl: signatureData.signature_url,
+          cloudinaryId: signatureData.signature_url.split('/').pop()?.split('.')[0] || '',
+        }));
+      } else {
+        setSettings(prev => ({
+          ...prev,
+          presidentSignature: '',
+          cloudinaryUrl: '',
+          cloudinaryId: '',
+        }));
+      }
+    } catch (error) {
+      console.error('Erreur lors du rafraîchissement:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          style={styles.scrollView} 
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
             <View style={styles.header}>
               <Text style={styles.title}>Signature du Président</Text>
               <Text style={styles.subtitle}>

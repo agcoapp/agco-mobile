@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
+  RefreshControl,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -61,6 +62,7 @@ export default function DocumentsScreen() {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
+  const [refreshing, setRefreshing] = useState(false);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [documents, setDocuments] = useState<{
     pv: Document[];
@@ -183,6 +185,17 @@ export default function DocumentsScreen() {
       }
     }
   }, []);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadDocuments(false); // Recharger sans afficher le loading
+    } catch (error) {
+      console.error('Erreur lors du rafraîchissement:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadDocuments]);
 
   // Charger les documents depuis localStorage au montage du composant
   useEffect(() => {
@@ -470,7 +483,7 @@ export default function DocumentsScreen() {
       setNewlyAddedDocument(newDocumentData.titre);
       await loadDocuments(false);
 
-      setToastMessage('Document ajouté ! La ligne est mise en surbrillance en vert.');
+      setToastMessage('Texte officiel ajouté !');
       setToastType('success');
       setShowToast(true);
 
@@ -586,6 +599,9 @@ export default function DocumentsScreen() {
                 </Text>
                 <FlatList
                   data={filterDocuments(documents.pv)}
+                  refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                  }
                   renderItem={({ item }) => (
                     <View style={[styles.documentItem, getListItemStyles(item.titre)]}>
                       <View style={styles.documentIcon}>
@@ -638,6 +654,9 @@ export default function DocumentsScreen() {
                 </Text>
                 <FlatList
                   data={filterDocuments(documents.comptesRendus)}
+                  refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                  }
                   renderItem={({ item }) => (
                     <View style={[styles.documentItem, getListItemStyles(item.titre)]}>
                       <View style={styles.documentIcon}>
@@ -690,6 +709,9 @@ export default function DocumentsScreen() {
                 </Text>
                 <FlatList
                   data={filterDocuments(documents.decisions)}
+                  refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                  }
                   renderItem={({ item }) => (
                     <View style={[styles.documentItem, getListItemStyles(item.titre)]}>
                       <View style={styles.documentIcon}>
@@ -743,6 +765,9 @@ export default function DocumentsScreen() {
                 {documents.reglement ? (
                   <FlatList
                     data={filterDocuments([documents.reglement])}
+                    refreshControl={
+                      <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                    }
                     renderItem={({ item }) => (
                       <View style={[styles.documentItem, getListItemStyles(item.titre)]}>
                         <View style={styles.documentIcon}>
