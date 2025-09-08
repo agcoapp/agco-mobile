@@ -271,7 +271,10 @@ export default function MembresScreen() {
   };
 
   const handleGenerateCard = (member: AdhesionFormMember) => {
-    Alert.alert('Génération de carte', 'Fonctionnalité de génération de carte à implémenter');
+    router.navigate({
+      pathname: '/carte/[id]',
+      params: { id: member.id.toString() }
+    });
   };
 
   const formatDate = (dateString: string | null) => {
