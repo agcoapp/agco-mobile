@@ -21,9 +21,9 @@ const CarteRectoGenerator = forwardRef<CarteRectoGeneratorRef, CarteRectoGenerat
     const viewShotRef = useRef<ViewShot>(null);
     const webViewRef = useRef<WebView>(null);
 
-    const cleanCodeFormulaire = (code: string) => {
+    const cleanCodeFormulaire = (code: string | null | undefined) => {
       if (!code) return 'Non spécifié';
-      return code.replace(/[^a-zA-Z0-9]/g, '');
+      return code.replace(/^N°/, '');
     };
 
     const generateHTML = (memberData: any, logoBase64?: string, photoUrl?: string, adhesionNumber?: string) => {

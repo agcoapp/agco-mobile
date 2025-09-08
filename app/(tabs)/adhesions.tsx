@@ -287,7 +287,7 @@ export default function AdhesionsScreen() {
       // Ajouter le numéro d'adhésion à member pour l'affichage sur la carte
       const memberWithNumber = {
         ...member,
-        numero_adhesion: "AGC-2024-001" // Numéro d'adhésion par défaut
+        numero_adhesion: member.numero_adhesion || "AGC-2024-001" // Utiliser le numéro de l'API ou défaut
       };
       
       console.log('🏷️ Numéro d\'adhésion ajouté à member:', memberWithNumber.numero_adhesion);
@@ -552,24 +552,23 @@ export default function AdhesionsScreen() {
       console.log('✅ Carte VERSO uploadée:', versoResult.url);
       
       // Appeler l'API pour approuver le formulaire avec les URLs des cartes
-      // console.log('📋 Appel de l\'API pour approuver le formulaire...');
-      // const result = await apiService.approveForm({
-      //   id_utilisateur: id,
-      //   commentaire: 'Formulaire approuvé avec succès',
-      //   url_formulaire_final: cloudinaryResult.url,
-      //   carte_recto_url: rectoResult.url,
-      //   carte_verso_url: versoResult.url
-      // });
+      console.log('📋 Appel de l\'API pour approuver le formulaire...');
+      const result = await apiService.approveForm({
+        id_utilisateur: id,
+        commentaire: 'Formulaire approuvé avec succès',
+        url_formulaire_final: cloudinaryResult.url,
+        carte_recto_url: rectoResult.url,
+        carte_verso_url: versoResult.url
+      });
       
-      // console.log('✅ Formulaire approuvé avec succès:', result);
+      console.log('✅ Formulaire approuvé avec succès:', result);
       
       // Récupérer le numéro d'adhésion de la réponse
-      // const numeroAdhesion = result?.utilisateur?.numero_adhesion || result?.numero_adhesion;
-      // console.log('🏷️ Numéro d\'adhésion obtenu:', numeroAdhesion);
-      
-      // if (!numeroAdhesion) {
-      //   throw new Error('Numéro d\'adhésion non trouvé dans la réponse de l\'API');
-      // }
+      const numeroAdhesion = result?.utilisateur?.numero_adhesion;
+
+      if (!numeroAdhesion) {
+        throw new Error('Numéro d\'adhésion non trouvé dans la réponse de l\'API');
+      }
       
       // Maintenant que nous avons le numéro d'adhésion, régénérer le PNG et le réuploader
       console.log('🔄 Régénération du PNG avec le numéro d\'adhésion...');
@@ -577,7 +576,7 @@ export default function AdhesionsScreen() {
         specificAdhesion.formulaire_actuel.donnees_snapshot, 
         presidentSignatureUrl, 
         publicId,
-        "numeroAdhesion"
+        numeroAdhesion
       );
 
       console.log('✅ PNG final avec numéro d\'adhésion:', finalUrl);
@@ -591,10 +590,8 @@ export default function AdhesionsScreen() {
       // Ajouter le numéro d'adhésion à specificAdhesion pour l'affichage sur la carte
       const specificAdhesionWithNumber = {
         ...specificAdhesion,
-        numero_adhesion: "AGC-2024-001" // Numéro d'adhésion par défaut
+        numero_adhesion: numeroAdhesion // Utiliser le numéro de l'API ou défaut
       };
-      
-      console.log('🏷️ Numéro d\'adhésion ajouté à specificAdhesion:', specificAdhesionWithNumber.numero_adhesion);
       
       const rectoBase64WithNumber = await generateCardRecto(specificAdhesionWithNumber);
       
@@ -616,11 +613,11 @@ export default function AdhesionsScreen() {
       console.log('✅ Cartes RECTO et VERSO régénérées et réuploadées avec succès !');
 
       // Mettre à jour la liste locale
-      // const updatedAdhesions = adhesions.map((a: any) => 
-      //   a.id === id ? { ...a, statut: 'APPROUVE' as const } : a
-      // );
+      const updatedAdhesions = adhesions.map((a: any) => 
+        a.id === id ? { ...a, statut: 'APPROUVE' as const } : a
+      );
       
-      // setAdhesions(updatedAdhesions);
+      setAdhesions(updatedAdhesions);
       
       Alert.alert(
         'Succès',
