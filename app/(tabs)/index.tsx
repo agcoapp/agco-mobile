@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
 import * as Print from 'expo-print';
 import { router } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,8 +19,6 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import CarteRectoGenerator, { CarteRectoGeneratorRef } from '../../components/CarteRectoGenerator';
-import CarteVersoGenerator, { CarteVersoGeneratorRef } from '../../components/CarteVersoGenerator';
 import { useAuth } from '../../hooks/useAuth';
 import { apiService } from '../../services/apiService';
 
@@ -35,6 +34,14 @@ interface DashboardStats {
 interface MemberCardImages {
   recto: string;
   verso: string;
+}
+
+interface MemberForDownload {
+  nom_complet: string;
+  carte_membre: {
+    recto_url: string;
+    verso_url: string;
+  };
 }
 
 export default function DashboardScreen() {
@@ -54,8 +61,6 @@ export default function DashboardScreen() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   
-  const carteRectoGeneratorRef = useRef<CarteRectoGeneratorRef>(null);
-  const carteVersoGeneratorRef = useRef<CarteVersoGeneratorRef>(null);
 
   useEffect(() => {
     const loadStats = async () => {
@@ -133,18 +138,29 @@ export default function DashboardScreen() {
 
   // Fonction pour afficher l'Alert de sélection du format
   const showDownloadFormatAlert = () => {
+    if (!user) return;
+    
+    // Créer un objet membre avec les données nécessaires pour le téléchargement
+    const memberForDownload: MemberForDownload = {
+      nom_complet: `${user.prenoms} ${user.nom}`,
+      carte_membre: {
+        recto_url: memberCardImages.recto,
+        verso_url: memberCardImages.verso
+      }
+    };
+    
     Alert.alert(
       'Choisir le format',
       'Dans quel format souhaitez-vous télécharger la carte ?',
       [
         {
           text: 'PNG',
-          onPress: generateCartePNG,
+          onPress: () => downloadCompletePNG(memberForDownload),
           style: 'default',
         },
         {
           text: 'PDF',
-          onPress: generateCartePDF,
+          onPress: () => downloadPDF(memberForDownload),
           style: 'default',
         },
         {
@@ -156,114 +172,171 @@ export default function DashboardScreen() {
     );
   };
 
-  // Fonction pour générer la carte en PNG
-  const generateCartePNG = async () => {
-    if (!user) return;
-    
-    setIsDownloading(true);
+  // Fonction pour télécharger une carte complète (recto + verso) en PNG
+  const downloadCompletePNG = async (member: MemberForDownload) => {
     try {
-      console.log('🔄 Génération de la carte PNG...');
+      setIsDownloading(true);
       
-      // Générer les cartes RECTO et VERSO
-      const rectoBase64 = await carteRectoGeneratorRef.current?.generatePNG();
-      const versoBase64 = await carteVersoGeneratorRef.current?.generatePNG();
+      // Demander les permissions
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission refusée', 'Permission nécessaire pour sauvegarder l\'image');
+        return;
+      }
+
+      // Vérifier que les deux images existent
+      if (!member.carte_membre.recto_url || !member.carte_membre.verso_url) {
+        Alert.alert('Images manquantes', 'Les images recto et verso sont requises pour créer une carte complète');
+        return;
+      }
+
+      // Télécharger les deux images
+      const rectoFileName = `${member.nom_complet}_recto_temp.png`;
+      const versoFileName = `${member.nom_complet}_verso_temp.png`;
+      const rectoUri = `${FileSystem.documentDirectory}${rectoFileName}`;
+      const versoUri = `${FileSystem.documentDirectory}${versoFileName}`;
       
-      if (rectoBase64 && versoBase64) {
-        // Créer un nom de fichier unique
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const fileName = `carte-membre-${user.nom_utilisateur}-${timestamp}.png`;
-        
-        // Sauvegarder le fichier
-        const fileUri = `${FileSystem.documentDirectory}${fileName}`;
-        await FileSystem.writeAsStringAsync(fileUri, rectoBase64, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-        
-        // Partager le fichier
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(fileUri, {
-            mimeType: 'image/png',
-            dialogTitle: 'Partager la carte de membre',
-          });
+      // Télécharger recto
+      const rectoResult = await FileSystem.downloadAsync(
+        member.carte_membre.recto_url,
+        rectoUri,
+        {
+          headers: {
+            'Accept': 'image/png'
+          }
         }
+      );
+
+      // Télécharger verso
+      const versoResult = await FileSystem.downloadAsync(
+        member.carte_membre.verso_url,
+        versoUri,
+        {
+          headers: {
+            'Accept': 'image/png'
+          }
+        }
+      );
+
+      if (rectoResult.status === 200 && versoResult.status === 200) {
+        // Sauvegarder recto
+        const rectoAsset = await MediaLibrary.createAssetAsync(rectoUri);
+        await MediaLibrary.createAlbumAsync('Cartes Membres', rectoAsset, false);
         
-        console.log('✅ Carte PNG générée et partagée avec succès');
+        // Sauvegarder verso
+        const versoAsset = await MediaLibrary.createAssetAsync(versoUri);
+        await MediaLibrary.createAlbumAsync('Cartes Membres', versoAsset, false);
+        
+        Alert.alert('Succès', `Carte complète de ${member.nom_complet} téléchargée (recto + verso)`);
+      } else {
+        Alert.alert('Erreur', 'Impossible de télécharger les images');
       }
     } catch (error) {
-      console.error('❌ Erreur lors de la génération PNG:', error);
-      Alert.alert('Erreur', 'Impossible de générer la carte PNG');
+      console.error('Erreur lors du téléchargement PNG complet:', error);
+      Alert.alert('Erreur', 'Erreur lors du téléchargement');
     } finally {
       setIsDownloading(false);
     }
   };
 
-  // Fonction pour générer la carte en PDF
-  const generateCartePDF = async () => {
-    if (!user) return;
-    
-    setIsDownloading(true);
+  // Fonction pour créer et télécharger un PDF individuel
+  const downloadPDF = async (member: MemberForDownload) => {
     try {
-      console.log('🔄 Génération de la carte PDF...');
+      setIsDownloading(true);
       
-      // Générer les cartes RECTO et VERSO
-      const rectoBase64 = await carteRectoGeneratorRef.current?.generatePNG();
-      const versoBase64 = await carteVersoGeneratorRef.current?.generatePNG();
+      // Créer le contenu HTML pour le PDF avec les images intégrées
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Carte Membre - ${member.nom_complet}</title>
+          <style>
+            body { 
+              font-family: Arial, sans-serif; 
+              margin: 20px; 
+              background-color: #f5f5f5;
+            }
+            .header { 
+              text-align: center; 
+              margin-bottom: 30px; 
+              background-color: white;
+              padding: 20px;
+              border-radius: 8px;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .member-info { 
+              margin-bottom: 20px; 
+              background-color: white;
+              padding: 20px;
+              border-radius: 8px;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .card-section { 
+              margin-bottom: 30px; 
+              background-color: white;
+              padding: 20px;
+              border-radius: 8px;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .card-title { 
+              font-weight: bold; 
+              margin-bottom: 15px; 
+              color: #333;
+              font-size: 18px;
+            }
+            .card-image { 
+              max-width: 100%; 
+              height: auto; 
+              border-radius: 8px;
+              box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            }
+            .info-row {
+              margin-bottom: 10px;
+            }
+            .info-label {
+              font-weight: bold;
+              color: #555;
+            }
+            .info-value {
+              color: #333;
+            }
+          </style>
+        </head>
+        <body>          
+          ${member.carte_membre.recto_url ? `
+            <div class="card-section">
+              <img src="${member.carte_membre.recto_url}" class="card-image" alt="Carte recto" />
+            </div>
+          ` : ''}
+          
+          ${member.carte_membre.verso_url ? `
+            <div class="card-section">
+              <img src="${member.carte_membre.verso_url}" class="card-image" alt="Carte verso" />
+            </div>
+          ` : ''}
+        </body>
+        </html>
+      `;
+
+      // Générer le PDF avec expo-print
+      const { uri } = await Print.printToFileAsync({
+        html: htmlContent,
+        base64: false
+      });
       
-      if (rectoBase64 && versoBase64) {
-        // Créer le HTML pour le PDF
-        const html = `
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <meta charset="utf-8">
-              <style>
-                body { margin: 0; padding: 20px; font-family: Arial, sans-serif; }
-                .page { page-break-after: always; text-align: center; }
-                .page:last-child { page-break-after: avoid; }
-                img { max-width: 100%; height: auto; }
-                .title { font-size: 18px; font-weight: bold; margin-bottom: 20px; }
-              </style>
-            </head>
-            <body>
-              <div class="page">
-                <div class="title">Carte de Membre - RECTO</div>
-                <img src="data:image/png;base64,${rectoBase64}" alt="Carte RECTO" />
-              </div>
-              <div class="page">
-                <div class="title">Carte de Membre - VERSO</div>
-                <img src="data:image/png;base64,${versoBase64}" alt="Carte VERSO" />
-              </div>
-            </body>
-          </html>
-        `;
-        
-        // Générer le PDF
-        const { uri } = await Print.printToFileAsync({ html });
-        
-        // Créer un nom de fichier unique
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const fileName = `carte-membre-${user.nom_utilisateur}-${timestamp}.pdf`;
-        const finalUri = `${FileSystem.documentDirectory}${fileName}`;
-        
-        // Renommer le fichier
-        await FileSystem.moveAsync({
-          from: uri,
-          to: finalUri,
+      // Partager le fichier PDF
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: `Carte Membre - ${member.nom_complet}`
         });
-        
-        // Partager le fichier
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(finalUri, {
-            mimeType: 'application/pdf',
-            dialogTitle: 'Partager la carte de membre',
-          });
-        }
-        
-        console.log('✅ Carte PDF générée et partagée avec succès');
+      } else {
+        Alert.alert('Partage non disponible', 'Le partage de fichiers n\'est pas disponible sur cet appareil');
       }
     } catch (error) {
-      console.error('❌ Erreur lors de la génération PDF:', error);
-      Alert.alert('Erreur', 'Impossible de générer la carte PDF');
+      console.error('Erreur lors de la création du PDF:', error);
+      Alert.alert('Erreur', 'Erreur lors de la création du PDF');
     } finally {
       setIsDownloading(false);
     }
@@ -405,55 +478,6 @@ export default function DashboardScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Composants de génération cachés */}
-            <CarteRectoGenerator
-              ref={carteRectoGeneratorRef}
-              member={{
-                nom: user?.nom || '',
-                prenoms: user?.prenoms || '',
-                profession: '',
-                date_naissance: '',
-                telephone: '',
-                selfie_photo_url: '',
-                lieu_naissance: '',
-                adresse: '',
-                ville_residence: '',
-                numero_carte_consulaire: '',
-                date_emission_piece: '',
-                date_entree_congo: '',
-                employeur_ecole: '',
-                nom_conjoint: '',
-                prenom_conjoint: '',
-                nombre_enfants: '',
-                commentaire: '',
-                statut: 'APPROUVE',
-                soumis_le: new Date().toISOString(),
-              }}
-            />
-            <CarteVersoGenerator
-              ref={carteVersoGeneratorRef}
-              member={{
-                nom: user?.nom || '',
-                prenoms: user?.prenoms || '',
-                profession: '',
-                date_naissance: '',
-                telephone: '',
-                selfie_photo_url: '',
-                lieu_naissance: '',
-                adresse: '',
-                ville_residence: '',
-                numero_carte_consulaire: '',
-                date_emission_piece: '',
-                date_entree_congo: '',
-                employeur_ecole: '',
-                nom_conjoint: '',
-                prenom_conjoint: '',
-                nombre_enfants: '',
-                commentaire: '',
-                statut: 'APPROUVE',
-                soumis_le: new Date().toISOString(),
-              }}
-            />
 
             {/* Actions rapides */}
             <View style={styles.actionsSection}>
@@ -465,7 +489,7 @@ export default function DashboardScreen() {
                     try {
                       const userStatus = await apiService.getUserStatus();
                       if (userStatus) {
-                        router.push('/membre/mon-adhesion');
+                        router.push(`/adhesion/${user.id}`);
                       }
                     } catch (error) {
                       console.error('Erreur lors de la récupération de la carte:', error);

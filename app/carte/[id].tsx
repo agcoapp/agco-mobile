@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
 import * as Print from 'expo-print';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -16,8 +17,6 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import CarteRectoGenerator, { CarteRectoGeneratorRef } from '../../components/CarteRectoGenerator';
-import CarteVersoGenerator, { CarteVersoGeneratorRef } from '../../components/CarteVersoGenerator';
 import { apiService } from '../../services/apiService';
 import { cleanCodeFormulaire } from '../../utils/fonctions';
 
@@ -25,6 +24,14 @@ const { width } = Dimensions.get('window');
 
 interface MemberCard {
   id: number;
+  carte_membre: {
+    recto_url: string;
+    verso_url: string;
+  };
+}
+
+interface MemberForDownload {
+  nom_complet: string;
   carte_membre: {
     recto_url: string;
     verso_url: string;
@@ -73,8 +80,6 @@ export default function CarteMembreScreen() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   
-  const carteRectoGeneratorRef = useRef<CarteRectoGeneratorRef>(null);
-  const carteVersoGeneratorRef = useRef<CarteVersoGeneratorRef>(null);
 
   useEffect(() => {
     const fetchMemberData = async () => {
@@ -138,18 +143,29 @@ export default function CarteMembreScreen() {
 
   // Fonction pour afficher l'Alert de sélection du format
   const showDownloadFormatAlert = () => {
+    if (!member) return;
+    
+    // Créer un objet membre avec les données nécessaires pour le téléchargement
+    const memberForDownload: MemberForDownload = {
+      nom_complet: member.nom_complet,
+      carte_membre: {
+        recto_url: memberCard?.carte_membre?.recto_url || '',
+        verso_url: memberCard?.carte_membre?.verso_url || ''
+      }
+    };
+    
     Alert.alert(
       'Choisir le format',
       'Dans quel format souhaitez-vous télécharger la carte ?',
       [
         {
           text: 'PNG',
-          onPress: generateCartePNG,
+          onPress: () => downloadCompletePNG(memberForDownload),
           style: 'default',
         },
         {
           text: 'PDF',
-          onPress: generateCartePDF,
+          onPress: () => downloadPDF(memberForDownload),
           style: 'default',
         },
         {
@@ -161,164 +177,177 @@ export default function CarteMembreScreen() {
     );
   };
 
-  // Fonction pour générer la carte en PNG
-  const generateCartePNG = async () => {
-    if (!member) return;
-    
-    setIsDownloading(true);
+  // Fonction pour télécharger une carte complète (recto + verso) en PNG
+  const downloadCompletePNG = async (member: MemberForDownload) => {
     try {
-      console.log('🔄 Génération de la carte PNG...');
+      setIsDownloading(true);
       
-      // Générer les cartes RECTO et VERSO
-      const rectoBase64 = await carteRectoGeneratorRef.current?.generatePNG();
-      const versoBase64 = await carteVersoGeneratorRef.current?.generatePNG();
-      
-      if (!rectoBase64 || !versoBase64) {
-        throw new Error('Erreur lors de la génération des cartes');
+      // Demander les permissions
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission refusée', 'Permission nécessaire pour sauvegarder l\'image');
+        return;
       }
+
+      // Vérifier que les deux images existent
+      if (!member.carte_membre.recto_url || !member.carte_membre.verso_url) {
+        Alert.alert('Images manquantes', 'Les images recto et verso sont requises pour créer une carte complète');
+        return;
+      }
+
+      // Télécharger les deux images
+      const rectoFileName = `${member.nom_complet}_recto_temp.png`;
+      const versoFileName = `${member.nom_complet}_verso_temp.png`;
+      const rectoUri = `${FileSystem.documentDirectory}${rectoFileName}`;
+      const versoUri = `${FileSystem.documentDirectory}${versoFileName}`;
       
-      // Créer un nom de fichier unique
-      const fileName = `carte_membre_${cleanCodeFormulaire(member.code_formulaire)}.png`;
-      const fileUri = FileSystem.documentDirectory + fileName;
-      
-      // Convertir les base64 en fichiers temporaires
-      const rectoFileUri = FileSystem.documentDirectory + 'recto_temp.png';
-      const versoFileUri = FileSystem.documentDirectory + 'verso_temp.png';
-      
-      await FileSystem.writeAsStringAsync(rectoFileUri, rectoBase64, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      
-      await FileSystem.writeAsStringAsync(versoFileUri, versoBase64, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      
-      // Combiner les deux images (recto + verso)
-      const combinedBase64 = await combineImages(rectoBase64, versoBase64);
-      
-      // Sauvegarder le fichier final
-      await FileSystem.writeAsStringAsync(fileUri, combinedBase64, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      
-      // Partager le fichier
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(fileUri, {
-          mimeType: 'image/png',
-          dialogTitle: 'Télécharger la carte de membre',
-        });
+      // Télécharger recto
+      const rectoResult = await FileSystem.downloadAsync(
+        member.carte_membre.recto_url,
+        rectoUri,
+        {
+          headers: {
+            'Accept': 'image/png'
+          }
+        }
+      );
+
+      // Télécharger verso
+      const versoResult = await FileSystem.downloadAsync(
+        member.carte_membre.verso_url,
+        versoUri,
+        {
+          headers: {
+            'Accept': 'image/png'
+          }
+        }
+      );
+
+      if (rectoResult.status === 200 && versoResult.status === 200) {
+        // Sauvegarder recto
+        const rectoAsset = await MediaLibrary.createAssetAsync(rectoUri);
+        await MediaLibrary.createAlbumAsync('Cartes Membres', rectoAsset, false);
+        
+        // Sauvegarder verso
+        const versoAsset = await MediaLibrary.createAssetAsync(versoUri);
+        await MediaLibrary.createAlbumAsync('Cartes Membres', versoAsset, false);
+        
+        Alert.alert('Succès', `Carte complète de ${member.nom_complet} téléchargée (recto + verso)`);
       } else {
-        Alert.alert('Succès', 'Carte générée avec succès !');
+        Alert.alert('Erreur', 'Impossible de télécharger les images');
       }
-      
-      // Nettoyer les fichiers temporaires
-      await FileSystem.deleteAsync(rectoFileUri, { idempotent: true });
-      await FileSystem.deleteAsync(versoFileUri, { idempotent: true });
-      
-      console.log('✅ Carte PNG générée avec succès');
-      
     } catch (error) {
-      console.error('❌ Erreur lors de la génération de la carte PNG:', error);
-      Alert.alert('Erreur', 'Impossible de générer la carte PNG');
+      console.error('Erreur lors du téléchargement PNG complet:', error);
+      Alert.alert('Erreur', 'Erreur lors du téléchargement');
     } finally {
       setIsDownloading(false);
     }
   };
 
-  // Fonction pour générer la carte en PDF
-  const generateCartePDF = async () => {
-    if (!member) return;
-    
-    setIsDownloading(true);
+  // Fonction pour créer et télécharger un PDF individuel
+  const downloadPDF = async (member: MemberForDownload) => {
     try {
-      console.log('🔄 Génération de la carte PDF...');
+      setIsDownloading(true);
       
-      // Générer les cartes RECTO et VERSO
-      const rectoBase64 = await carteRectoGeneratorRef.current?.generatePNG();
-      const versoBase64 = await carteVersoGeneratorRef.current?.generatePNG();
-      
-      if (!rectoBase64 || !versoBase64) {
-        throw new Error('Erreur lors de la génération des cartes');
-      }
-      
-      // Créer le HTML pour le PDF avec les deux cartes
+      // Créer le contenu HTML pour le PDF avec les images intégrées
       const htmlContent = `
         <!DOCTYPE html>
         <html>
         <head>
-          <meta charset="UTF-8">
+          <meta charset="utf-8">
+          <title>Carte Membre - ${member.nom_complet}</title>
           <style>
-            body {
-              margin: 0;
+            body { 
+              font-family: Arial, sans-serif; 
+              margin: 20px; 
+              background-color: #f5f5f5;
+            }
+            .header { 
+              text-align: center; 
+              margin-bottom: 30px; 
+              background-color: white;
               padding: 20px;
-              font-family: Arial, sans-serif;
+              border-radius: 8px;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             }
-            .card-container {
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              gap: 20px;
+            .member-info { 
+              margin-bottom: 20px; 
+              background-color: white;
+              padding: 20px;
+              border-radius: 8px;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             }
-            .card {
-              max-width: 100%;
-              height: auto;
+            .card-section { 
+              margin-bottom: 30px; 
+              background-color: white;
+              padding: 20px;
+              border-radius: 8px;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             }
-            .card-title {
-              text-align: center;
+            .card-title { 
+              font-weight: bold; 
+              margin-bottom: 15px; 
+              color: #333;
               font-size: 18px;
-              font-weight: bold;
+            }
+            .card-image { 
+              max-width: 100%; 
+              height: auto; 
+              border-radius: 8px;
+              box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            }
+            .info-row {
               margin-bottom: 10px;
+            }
+            .info-label {
+              font-weight: bold;
+              color: #555;
+            }
+            .info-value {
               color: #333;
             }
           </style>
         </head>
-        <body>
-          <div class="card-container">
-            <div>
-              <div class="card-title">RECTO</div>
-              <img src="data:image/png;base64,${rectoBase64}" class="card" />
+        <body>          
+          ${member.carte_membre.recto_url ? `
+            <div class="card-section">
+              <img src="${member.carte_membre.recto_url}" class="card-image" alt="Carte recto" />
             </div>
-            <div>
-              <div class="card-title">VERSO</div>
-              <img src="data:image/png;base64,${versoBase64}" class="card" />
+          ` : ''}
+          
+          ${member.carte_membre.verso_url ? `
+            <div class="card-section">
+              <img src="${member.carte_membre.verso_url}" class="card-image" alt="Carte verso" />
             </div>
-          </div>
+          ` : ''}
         </body>
         </html>
       `;
-      
-      // Générer le PDF
+
+      // Générer le PDF avec expo-print
       const { uri } = await Print.printToFileAsync({
         html: htmlContent,
-        base64: false,
+        base64: false
       });
       
-      // Partager le PDF
+      // Partager le fichier PDF
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri, {
           mimeType: 'application/pdf',
-          dialogTitle: 'Télécharger la carte de membre',
+          dialogTitle: `Carte Membre - ${member.nom_complet}`
         });
       } else {
-        Alert.alert('Succès', 'Carte PDF générée avec succès !');
+        Alert.alert('Partage non disponible', 'Le partage de fichiers n\'est pas disponible sur cet appareil');
       }
       
-      console.log('✅ Carte PDF générée avec succès');
-      
     } catch (error) {
-      console.error('❌ Erreur lors de la génération de la carte PDF:', error);
-      Alert.alert('Erreur', 'Impossible de générer la carte PDF');
+      console.error('Erreur lors de la création du PDF:', error);
+      Alert.alert('Erreur', 'Erreur lors de la création du PDF');
     } finally {
       setIsDownloading(false);
     }
   };
 
-  // Fonction pour combiner deux images en une seule
-  const combineImages = async (rectoBase64: string, versoBase64: string): Promise<string> => {
-    // Pour simplifier, on retourne juste le recto
-    // Dans une implémentation complète, on utiliserait une librairie d'image processing
-    return rectoBase64;
-  };
 
   if (loading) {
     return (
@@ -525,19 +554,6 @@ export default function CarteMembreScreen() {
         </View>
       </ScrollView>
 
-      {/* Générateurs de cartes cachés */}
-      <CarteRectoGenerator
-        ref={carteRectoGeneratorRef}
-        member={member}
-        logoImage={undefined}
-        photoImage={member?.formulaire_actuel?.donnees_snapshot?.selfie_photo_url}
-      />
-      <CarteVersoGenerator
-        ref={carteVersoGeneratorRef}
-        member={member}
-        qrCodeImage={undefined}
-        signatureImage={undefined}
-      />
 
       {/* Modal pour afficher l'image en plein écran */}
       <Modal

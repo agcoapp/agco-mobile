@@ -61,9 +61,8 @@ export default function CustomDrawerContent(props: CustomDrawerContentProps) {
             })
           }}
         />
-        
-         {/* Lien spécifique pour les membres */}
-         {user?.role === 'MEMBRE' && (
+        {/* Lien spécifique pour les membres */}
+        {user?.role === 'MEMBRE' && (
            <TouchableOpacity
              style={styles.memberLink}
              onPress={() => {

@@ -2,21 +2,21 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Keyboard,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    RefreshControl,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  RefreshControl,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View
 } from 'react-native';
 import { useAuth } from '../../hooks/useAuth';
 import { apiService } from '../../services/apiService';
@@ -137,12 +137,14 @@ export default function MembresScreen() {
         } else {
           // Pour les membres, charger le répertoire des membres
           const memberData = await apiService.getMemberDirectory();
-          console.log("📊 Données membres reçues:", memberData);
+          console.log("📊 Données membres reçues:", memberData.donnees);
           
           let processedMemberData: any[] = [];
           
           if (memberData && typeof memberData === 'object') {
-            if (memberData.donnees && Array.isArray(memberData.donnees)) {
+            if (memberData.donnees && memberData.donnees.membres && Array.isArray(memberData.donnees.membres)) {
+              processedMemberData = memberData.donnees.membres;
+            } else if (memberData.donnees && Array.isArray(memberData.donnees)) {
               processedMemberData = memberData.donnees;
             } else if (Array.isArray(memberData)) {
               processedMemberData = memberData;
@@ -219,7 +221,6 @@ export default function MembresScreen() {
       // Charger les formulaires d'adhésion pour les admins
       if (user?.role === 'PRESIDENT' || user?.role === 'SECRETAIRE_GENERALE') {
         const data = await apiService.getAdhesionForms();
-        console.log("📊 Données reçues de l'API (refresh):", data);
         
         let processedData: any[] = [];
         
@@ -254,15 +255,17 @@ export default function MembresScreen() {
         
         setMembers(convertedMembers);
       } else {
-        // Charger les membres pour les autres rôles
-        const memberData = await apiService.getMembers();
-        console.log("📊 Données membres reçues de l'API (refresh):", memberData);
+        // Pour les membres, charger le répertoire des membres
+        const memberData = await apiService.getMemberDirectory();
+        console.log("📊 Données membres reçues de l'API (refresh):", memberData.donnees);
         
         let processedMemberData: any[] = [];
         
         if (memberData && typeof memberData === 'object') {
-          if (memberData.membres && Array.isArray(memberData.membres)) {
-            processedMemberData = memberData.membres;
+          if (memberData.donnees && memberData.donnees.membres && Array.isArray(memberData.donnees.membres)) {
+            processedMemberData = memberData.donnees.membres;
+          } else if (memberData.donnees && Array.isArray(memberData.donnees)) {
+            processedMemberData = memberData.donnees;
           } else if (Array.isArray(memberData)) {
             processedMemberData = memberData;
           }
@@ -281,10 +284,36 @@ export default function MembresScreen() {
           raison_rejet: null,
           rejete_le: null,
           rejete_par: null,
-          approuve_le: null,
-          approuve_par: null,
-          est_actif: apiMember.est_actif !== false,
-          formulaire_actuel: null
+          est_actif: apiMember.statut === 'APPROUVE',
+          formulaire_actuel: {
+            id: apiMember.id,
+            id_utilisateur: apiMember.id,
+            numero_version: 1,
+            url_image_formulaire: '',
+            donnees_snapshot: {
+              nom: apiMember.nom || '',
+              adresse: apiMember.adresse || '',
+              prenoms: apiMember.prenoms || '',
+              telephone: apiMember.telephone || '',
+              profession: apiMember.profession || 'Membre',
+              commentaire: '',
+              nom_conjoint: '',
+              signature_url: '',
+              date_naissance: '',
+              lieu_naissance: '',
+              nombre_enfants: 0,
+              employeur_ecole: '',
+              prenom_conjoint: '',
+              ville_residence: apiMember.ville_residence || '',
+              selfie_photo_url: '',
+              date_entree_congo: '',
+              date_emission_piece: '',
+              url_image_formulaire: '',
+              numero_carte_consulaire: ''
+            },
+            est_version_active: true,
+            cree_le: new Date().toISOString()
+          }
         }));
         
         setMembers(convertedMembers);
@@ -527,7 +556,7 @@ export default function MembresScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <View style={styles.content}>
+        <View style={styles.content}>
         {/* Bouton de retour */}
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#007AFF" />
@@ -543,6 +572,7 @@ export default function MembresScreen() {
           <TextInput
             style={styles.searchInput}
             placeholder="Rechercher par nom, prénom, adresse, téléphone ou email..."
+            placeholderTextColor="#8E8E93"
             value={searchTerm}
             onChangeText={setSearchTerm}
           />
@@ -588,16 +618,26 @@ export default function MembresScreen() {
             <FlatList
               data={searchedMembers}
               refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                <RefreshControl 
+                  refreshing={refreshing} 
+                  onRefresh={onRefresh}
+                  colors={['#007AFF']}
+                  tintColor="#007AFF"
+                  title="Actualisation..."
+                  titleColor="#666"
+                />
               }
               renderItem={renderMemberItem}
               keyExtractor={(item) => item.id.toString()}
-              showsVerticalScrollIndicator={false}
+              showsVerticalScrollIndicator={true}
               contentContainerStyle={styles.flatListContent}
+              style={styles.flatList}
+              bounces={true}
+              alwaysBounceVertical={true}
             />
           )}
         </View>
-      </View>
+        </View>
       </TouchableWithoutFeedback>
 
       {/* Modal de confirmation de retrait */}
@@ -800,8 +840,12 @@ const styles = StyleSheet.create({
   listContainer: {
     flex: 1,
   },
+  flatList: {
+    flex: 1,
+  },
   flatListContent: {
     paddingBottom: 20,
+    flexGrow: 1,
   },
   memberCard: {
     backgroundColor: 'white',

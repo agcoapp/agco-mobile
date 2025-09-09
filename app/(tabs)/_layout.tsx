@@ -32,12 +32,12 @@ export default function TabLayout() {
       return [
         ...baseScreens,
         <Drawer.Screen
-          key="membre/mon-adhesion"
-          name="membre/mon-adhesion"
+          key="adhesion/[id]"
+          name="adhesion/[id]"
           options={{
-            title: 'Ma fiche d\'adhésion',
+            title: "Ma fiche d'adhésion",
             drawerIcon: ({ color, size }: { color: string; size: number }) => (
-              <Ionicons name="person-add-outline" size={size} color={color} />
+              <Ionicons name="people-outline" size={size} color={color} />
             ),
           }}
         />,
@@ -62,8 +62,8 @@ export default function TabLayout() {
           }}
         />,
         <Drawer.Screen
-          key="membre/change-password"
-          name="membre/change-password"
+          key="change-password"
+          name="change-password"
           options={{
             title: 'Changer mot de passe',
             drawerIcon: ({ color, size }: { color: string; size: number }) => (
@@ -144,6 +144,19 @@ export default function TabLayout() {
             title: 'Signature du Président',
             drawerIcon: ({ color, size }: { color: string; size: number }) => (
               <Ionicons name="create-outline" size={size} color={color} />
+            ),
+          }}
+        />
+      );
+
+      adminScreens.push(
+        <Drawer.Screen
+          key="change-password"
+          name="change-password"
+          options={{
+            title: 'Changer mot de passe',
+            drawerIcon: ({ color, size }: { color: string; size: number }) => (
+              <Ionicons name="key-outline" size={size} color={color} />
             ),
           }}
         />
