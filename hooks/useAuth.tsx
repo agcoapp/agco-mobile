@@ -5,6 +5,7 @@ import { apiService, LoginRequest, LoginResponse, User } from '../services/apiSe
 
 interface AuthContextType {
   user: User | null;
+  userStatus: any | null;
   isLoading: boolean;
   login: (credentials: LoginRequest) => Promise<{
     shouldRedirect: boolean;
@@ -24,6 +25,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [userStatus, setUserStatus] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -46,6 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           // Utiliser les informations du user stockées dans AsyncStorage
           const parsedUserStatus = JSON.parse(savedUser);
+          setUserStatus(parsedUserStatus);
 
           console.log("📋 parsedUserStatus complet:", parsedUserStatus);
           
@@ -293,6 +296,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateUserProfile = async () => {
     try {
       const updatedUserStatus = await apiService.getUserStatus();
+      setUserStatus(updatedUserStatus);
       
       const user: User = {
         id: updatedUserStatus.utilisateur.id,
@@ -317,6 +321,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value: AuthContextType = {
     user,
+    userStatus,
     isLoading,
     login,
     logout,

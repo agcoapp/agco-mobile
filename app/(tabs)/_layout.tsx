@@ -1,12 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Drawer } from 'expo-router/drawer';
-import React from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { Image, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import CustomDrawerContent from '../../components/ui/CustomDrawerContent';
 import { useAuth } from '../../hooks/useAuth';
 
 export default function TabLayout() {
-  const { user, logout } = useAuth();
+  const { user, userStatus } = useAuth();
+  const [isProfileModalVisible, setIsProfileModalVisible] = useState(false);
 
   // Définir les liens selon le rôle de manière exclusive
   const getDrawerScreens = () => {
@@ -163,40 +164,19 @@ export default function TabLayout() {
     return `${prenomInitial}${nomInitial}`;
   };
 
-  // Fonction pour gérer le clic sur les initiales
+  // Fonction pour gérer le clic sur la photo/initiales
   const handleProfileClick = () => {
-    Alert.alert(
-      'Profil utilisateur',
-      `Nom: ${user?.prenoms} ${user?.nom}\nNom d'utilisateur: ${user?.nom_utilisateur}\nRôle: ${user?.role}`,
-      [
-        { text: 'Fermer', style: 'cancel' },
-        { 
-          text: 'Déconnexion', 
-          style: 'destructive',
-          onPress: () => {
-            Alert.alert(
-              'Déconnexion',
-              'Êtes-vous sûr de vouloir vous déconnecter ?',
-              [
-                {
-                  text: 'Annuler',
-                  style: 'cancel',
-                },
-                {
-                  text: 'Déconnexion',
-                  style: 'destructive',
-                  onPress: () => logout(),
-                },
-              ],
-              { cancelable: true }
-            );
-          }
-        }
-      ]
-    );
+    setIsProfileModalVisible(true);
   };
 
+  const closeProfileModal = () => {
+    setIsProfileModalVisible(false);
+  };
+
+
+
   return (
+    <View style={{ flex: 1 }}>
     <Drawer
       screenOptions={{
         headerStyle: {
@@ -219,11 +199,21 @@ export default function TabLayout() {
         headerRight: () => (
           <View style={styles.headerRight}>
             <TouchableOpacity
-              style={styles.initialsContainer}
+                style={styles.profileContainer}
               onPress={handleProfileClick}
               activeOpacity={0.7}
             >
+                {userStatus?.images?.selfie_photo ? (
+                  <Image
+                    source={{ uri: userStatus.images.selfie_photo }}
+                    style={styles.profileImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={styles.initialsContainer}>
               <Text style={styles.initialsText}>{getInitials()}</Text>
+                  </View>
+                )}
             </TouchableOpacity>
           </View>
         ),
@@ -232,6 +222,95 @@ export default function TabLayout() {
     >
       {getDrawerScreens()}
     </Drawer>
+      
+      {/* Modal de profil */}
+      <Modal
+        visible={isProfileModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeProfileModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={closeProfileModal}
+            >
+              <Ionicons name="close" size={24} color="#666" />
+            </TouchableOpacity>
+            
+            {/* Photo de profil ou initiales dans le modal */}
+            <View style={styles.modalProfileContainer}>
+              {userStatus?.images?.selfie_photo ? (
+                <TouchableOpacity activeOpacity={0.8}>
+                  <Image
+                    source={{ uri: userStatus.images.selfie_photo }}
+                    style={styles.modalProfileImage}
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.modalInitialsContainer}>
+                  <Text style={styles.modalInitialsText}>{getInitials()}</Text>
+                </View>
+              )}
+            </View>
+            
+            {/* Informations du membre */}
+            <View style={styles.memberInfo}>
+              <Text style={styles.memberName}>
+                {userStatus?.utilisateur?.prenoms} {userStatus?.utilisateur?.nom}
+              </Text>
+              <Text style={styles.memberRole}>
+                {userStatus?.utilisateur?.role === 'MEMBRE' ? 'Membre' : userStatus?.utilisateur?.role}
+              </Text>
+              <Text style={styles.memberUsername}>
+                @{userStatus?.utilisateur?.nom_utilisateur}
+              </Text>
+              
+              {userStatus?.utilisateur && (
+                <View style={styles.memberDetails}>
+                  {userStatus.utilisateur.numero_adhesion && (
+                    <View style={styles.detailRow}>
+                      <Ionicons name="card-outline" size={16} color="#666" />
+                      <Text style={styles.detailText}>N° {userStatus.utilisateur.numero_adhesion}</Text>
+                    </View>
+                  )}
+
+                  {userStatus.utilisateur.prenoms && userStatus.utilisateur.nom && (
+                    <View style={styles.detailRow}>
+                      <Ionicons name="person-outline" size={16} color="#666" />
+                      <Text style={styles.detailText}>{userStatus.utilisateur.prenoms} {userStatus.utilisateur.nom}</Text>
+                    </View>
+                  )}
+
+                  {userStatus.utilisateur.adresse && (
+                    <View style={styles.detailRow}>
+                      <Ionicons name="location-outline" size={16} color="#666" />
+                      <Text style={styles.detailText}>{userStatus.utilisateur.adresse}</Text>
+                    </View>
+                  )}
+                  
+                  {userStatus.utilisateur.telephone && (
+                    <View style={styles.detailRow}>
+                      <Ionicons name="call-outline" size={16} color="#666" />
+                      <Text style={styles.detailText}>{userStatus.utilisateur.telephone}</Text>
+                    </View>
+                  )}
+
+                  {userStatus.utilisateur.email && (
+                    <View style={styles.detailRow}>
+                      <Ionicons name="mail-outline" size={16} color="#666" />
+                      <Text style={styles.detailText}>{userStatus.utilisateur.email}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
@@ -253,5 +332,125 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  profileContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileImage: {
+    width: 35,
+    height: 35,
+    borderRadius: 17.5,
+    borderWidth: 2,
+    borderColor: 'white',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 30,
+    alignItems: 'center',
+    width: '90%',
+    maxWidth: 400,
+  },
+  modalCloseButton: {
+    position: 'absolute',
+    top: 15,
+    right: 15,
+    padding: 5,
+  },
+  modalProfileContainer: {
+    marginBottom: 20,
+  },
+  modalProfileImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 4,
+    borderColor: '#007AFF',
+  },
+  modalInitialsContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#007AFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 4,
+    borderColor: '#007AFF',
+  },
+  modalInitialsText: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  memberInfo: {
+    alignItems: 'center',
+  },
+  memberName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  memberRole: {
+    fontSize: 16,
+    color: '#007AFF',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  memberUsername: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  memberStatus: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
+  memberDetails: {
+    marginTop: 15,
+    width: '100%',
+    alignItems: 'center',
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    paddingHorizontal: 10,
+  },
+  detailText: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 8,
+    textAlign: 'center',
+  },
+  imageModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageModalCloseButton: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 20,
+    padding: 10,
+  },
+  fullScreenImage: {
+    width: '90%',
+    height: '80%',
   },
 });

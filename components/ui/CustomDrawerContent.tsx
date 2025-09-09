@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { DrawerContentScrollView, DrawerItemList } from '@react-navigation/drawer';
+import { router } from 'expo-router';
 import React from 'react';
 import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../hooks/useAuth';
@@ -11,7 +12,7 @@ interface CustomDrawerContentProps {
 }
 
 export default function CustomDrawerContent(props: CustomDrawerContentProps) {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
 
   const handleLogout = () => {
     Alert.alert(
@@ -45,7 +46,35 @@ export default function CustomDrawerContent(props: CustomDrawerContentProps) {
       
       {/* Contenu du Drawer */}
       <DrawerContentScrollView {...props} style={styles.drawerContent} contentContainerStyle={styles.drawerContentContainer}>
-        <DrawerItemList {...props} />
+        <DrawerItemList 
+          {...props} 
+          state={{
+            ...props.state,
+            routes: props.state.routes.filter((route: any) => {
+              // Si l'utilisateur est un membre, masquer certains liens
+              if (user?.role === 'MEMBRE') {
+                const hiddenRoutes = ['codes', 'cartes', 'settings', 'adhesions'];
+                return !hiddenRoutes.includes(route.name);
+              }
+              // Pour les autres rôles, afficher tous les liens
+              return true;
+            })
+          }}
+        />
+        
+         {/* Lien spécifique pour les membres */}
+         {user?.role === 'MEMBRE' && (
+           <TouchableOpacity
+             style={styles.memberLink}
+             onPress={() => {
+               router.push(`/adhesion/${user.id}`);
+             }}
+             activeOpacity={0.7}
+           >
+             <Ionicons name="person-outline" size={24} color="#666" />
+             <Text style={styles.memberLinkText}>Ma fiche d'adhésion</Text>
+           </TouchableOpacity>
+         )}
         
         {/* Bouton de déconnexion */}
         <View style={styles.logoutSection}>
@@ -86,6 +115,21 @@ const styles = StyleSheet.create({
   drawerContentContainer: {
     paddingTop: 0,
     flexGrow: 1,
+  },
+  memberLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  memberLinkText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#666',
+    marginLeft: 12,
   },
   logoutSection: {
     marginTop: 'auto',

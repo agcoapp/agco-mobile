@@ -1,9 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as FileSystem from 'expo-file-system';
+import * as Print from 'expo-print';
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import * as Sharing from 'expo-sharing';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  Dimensions,
   Image,
+  Modal,
   RefreshControl,
   SafeAreaView,
   ScrollView,
@@ -12,8 +18,12 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import CarteRectoGenerator, { CarteRectoGeneratorRef } from '../../components/CarteRectoGenerator';
+import CarteVersoGenerator, { CarteVersoGeneratorRef } from '../../components/CarteVersoGenerator';
 import { useAuth } from '../../hooks/useAuth';
 import { apiService } from '../../services/apiService';
+
+const { width } = Dimensions.get('window');
 
 interface DashboardStats {
   totalMembers: number;
@@ -40,11 +50,17 @@ export default function DashboardScreen() {
   const [memberCardImages, setMemberCardImages] = useState<MemberCardImages>({ recto: '', verso: '' });
   const [isLoadingCard, setIsLoadingCard] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  
+  const carteRectoGeneratorRef = useRef<CarteRectoGeneratorRef>(null);
+  const carteVersoGeneratorRef = useRef<CarteVersoGeneratorRef>(null);
 
   useEffect(() => {
     const loadStats = async () => {
-      // Ne pas charger les statistiques du secrétaire si l'utilisateur est un membre
-      if (user?.role === 'MEMBRE') {
+      // Ne pas charger les statistiques si l'utilisateur n'est pas connecté ou s'il est un membre
+      if (!user || user?.role === 'MEMBRE') {
         setIsLoading(false);
         return;
       }
@@ -55,7 +71,6 @@ export default function DashboardScreen() {
         
         // Récupérer les statistiques du tableau de bord via l'API
         const dashboardData = await apiService.getSecretaryDashboard();
-        console.log('Dashboard data:', dashboardData);
         
         setStats({
           totalMembers: dashboardData.donnees.statistiques.membres_approuves,
@@ -75,8 +90,8 @@ export default function DashboardScreen() {
   }, [user]);
 
   const onRefresh = async () => {
-    // Ne pas rafraîchir les statistiques du secrétaire si l'utilisateur est un membre
-    if (user?.role === 'MEMBRE') {
+    // Ne pas rafraîchir les statistiques si l'utilisateur n'est pas connecté ou s'il est un membre
+    if (!user || user?.role === 'MEMBRE') {
       setRefreshing(false);
       return;
     }
@@ -102,6 +117,155 @@ export default function DashboardScreen() {
       setError('Erreur lors du rafraîchissement des statistiques');
     } finally {
       setRefreshing(false);
+    }
+  };
+
+  // Fonction pour afficher l'image en plein écran
+  const handleImagePress = (imageUrl: string) => {
+    setSelectedImage(imageUrl);
+    setIsModalVisible(true);
+  };
+
+  const closeImageModal = () => {
+    setIsModalVisible(false);
+    setSelectedImage(null);
+  };
+
+  // Fonction pour afficher l'Alert de sélection du format
+  const showDownloadFormatAlert = () => {
+    Alert.alert(
+      'Choisir le format',
+      'Dans quel format souhaitez-vous télécharger la carte ?',
+      [
+        {
+          text: 'PNG',
+          onPress: generateCartePNG,
+          style: 'default',
+        },
+        {
+          text: 'PDF',
+          onPress: generateCartePDF,
+          style: 'default',
+        },
+        {
+          text: 'Annuler',
+          style: 'cancel',
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  // Fonction pour générer la carte en PNG
+  const generateCartePNG = async () => {
+    if (!user) return;
+    
+    setIsDownloading(true);
+    try {
+      console.log('🔄 Génération de la carte PNG...');
+      
+      // Générer les cartes RECTO et VERSO
+      const rectoBase64 = await carteRectoGeneratorRef.current?.generatePNG();
+      const versoBase64 = await carteVersoGeneratorRef.current?.generatePNG();
+      
+      if (rectoBase64 && versoBase64) {
+        // Créer un nom de fichier unique
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const fileName = `carte-membre-${user.nom_utilisateur}-${timestamp}.png`;
+        
+        // Sauvegarder le fichier
+        const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+        await FileSystem.writeAsStringAsync(fileUri, rectoBase64, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        
+        // Partager le fichier
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(fileUri, {
+            mimeType: 'image/png',
+            dialogTitle: 'Partager la carte de membre',
+          });
+        }
+        
+        console.log('✅ Carte PNG générée et partagée avec succès');
+      }
+    } catch (error) {
+      console.error('❌ Erreur lors de la génération PNG:', error);
+      Alert.alert('Erreur', 'Impossible de générer la carte PNG');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  // Fonction pour générer la carte en PDF
+  const generateCartePDF = async () => {
+    if (!user) return;
+    
+    setIsDownloading(true);
+    try {
+      console.log('🔄 Génération de la carte PDF...');
+      
+      // Générer les cartes RECTO et VERSO
+      const rectoBase64 = await carteRectoGeneratorRef.current?.generatePNG();
+      const versoBase64 = await carteVersoGeneratorRef.current?.generatePNG();
+      
+      if (rectoBase64 && versoBase64) {
+        // Créer le HTML pour le PDF
+        const html = `
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="utf-8">
+              <style>
+                body { margin: 0; padding: 20px; font-family: Arial, sans-serif; }
+                .page { page-break-after: always; text-align: center; }
+                .page:last-child { page-break-after: avoid; }
+                img { max-width: 100%; height: auto; }
+                .title { font-size: 18px; font-weight: bold; margin-bottom: 20px; }
+              </style>
+            </head>
+            <body>
+              <div class="page">
+                <div class="title">Carte de Membre - RECTO</div>
+                <img src="data:image/png;base64,${rectoBase64}" alt="Carte RECTO" />
+              </div>
+              <div class="page">
+                <div class="title">Carte de Membre - VERSO</div>
+                <img src="data:image/png;base64,${versoBase64}" alt="Carte VERSO" />
+              </div>
+            </body>
+          </html>
+        `;
+        
+        // Générer le PDF
+        const { uri } = await Print.printToFileAsync({ html });
+        
+        // Créer un nom de fichier unique
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const fileName = `carte-membre-${user.nom_utilisateur}-${timestamp}.pdf`;
+        const finalUri = `${FileSystem.documentDirectory}${fileName}`;
+        
+        // Renommer le fichier
+        await FileSystem.moveAsync({
+          from: uri,
+          to: finalUri,
+        });
+        
+        // Partager le fichier
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(finalUri, {
+            mimeType: 'application/pdf',
+            dialogTitle: 'Partager la carte de membre',
+          });
+        }
+        
+        console.log('✅ Carte PDF générée et partagée avec succès');
+      }
+    } catch (error) {
+      console.error('❌ Erreur lors de la génération PDF:', error);
+      Alert.alert('Erreur', 'Impossible de générer la carte PDF');
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -180,13 +344,16 @@ export default function DashboardScreen() {
                       <Text style={styles.loadingText}>Chargement De L'Image...</Text>
                     </View>
                   ) : memberCardImages.recto ? (
-                    <View style={styles.imageContainer}>
+                    <TouchableOpacity
+                      style={styles.imageTouchable}
+                      onPress={() => handleImagePress(memberCardImages.recto)}
+                    >
                       <Image
                         source={{ uri: memberCardImages.recto }}
                         style={styles.cardImage}
                         resizeMode="contain"
                       />
-                    </View>
+                    </TouchableOpacity>
                   ) : (
                     <View style={styles.noImageContainer}>
                       <Text style={styles.noImageText}>Image Du Recto Non Disponible</Text>
@@ -203,13 +370,16 @@ export default function DashboardScreen() {
                       <Text style={styles.loadingText}>Chargement De L'Image...</Text>
                     </View>
                   ) : memberCardImages.verso ? (
-                    <View style={styles.imageContainer}>
+                    <TouchableOpacity
+                      style={styles.imageTouchable}
+                      onPress={() => handleImagePress(memberCardImages.verso)}
+                    >
                       <Image
                         source={{ uri: memberCardImages.verso }}
                         style={styles.cardImage}
                         resizeMode="contain"
                       />
-                    </View>
+                    </TouchableOpacity>
                   ) : (
                     <View style={styles.noImageContainer}>
                       <Text style={styles.noImageText}>Image Du Verso Non Disponible</Text>
@@ -217,7 +387,73 @@ export default function DashboardScreen() {
                   )}
                 </View>
               </View>
+              
+              {/* Bouton de téléchargement */}
+              <TouchableOpacity
+                style={[styles.downloadButton, isDownloading && styles.downloadButtonDisabled]}
+                onPress={showDownloadFormatAlert}
+                disabled={isDownloading}
+              >
+                <Ionicons 
+                  name={isDownloading ? "hourglass-outline" : "download-outline"} 
+                  size={20} 
+                  color="white" 
+                />
+                <Text style={styles.downloadButtonText}>
+                  {isDownloading ? 'Génération...' : 'Télécharger'}
+                </Text>
+              </TouchableOpacity>
             </View>
+
+            {/* Composants de génération cachés */}
+            <CarteRectoGenerator
+              ref={carteRectoGeneratorRef}
+              member={{
+                nom: user?.nom || '',
+                prenoms: user?.prenoms || '',
+                profession: '',
+                date_naissance: '',
+                telephone: '',
+                selfie_photo_url: '',
+                lieu_naissance: '',
+                adresse: '',
+                ville_residence: '',
+                numero_carte_consulaire: '',
+                date_emission_piece: '',
+                date_entree_congo: '',
+                employeur_ecole: '',
+                nom_conjoint: '',
+                prenom_conjoint: '',
+                nombre_enfants: '',
+                commentaire: '',
+                statut: 'APPROUVE',
+                soumis_le: new Date().toISOString(),
+              }}
+            />
+            <CarteVersoGenerator
+              ref={carteVersoGeneratorRef}
+              member={{
+                nom: user?.nom || '',
+                prenoms: user?.prenoms || '',
+                profession: '',
+                date_naissance: '',
+                telephone: '',
+                selfie_photo_url: '',
+                lieu_naissance: '',
+                adresse: '',
+                ville_residence: '',
+                numero_carte_consulaire: '',
+                date_emission_piece: '',
+                date_entree_congo: '',
+                employeur_ecole: '',
+                nom_conjoint: '',
+                prenom_conjoint: '',
+                nombre_enfants: '',
+                commentaire: '',
+                statut: 'APPROUVE',
+                soumis_le: new Date().toISOString(),
+              }}
+            />
 
             {/* Actions rapides */}
             <View style={styles.actionsSection}>
@@ -262,6 +498,30 @@ export default function DashboardScreen() {
             </View>
           </View>
         </ScrollView>
+        
+        {/* Modal pour afficher l'image en plein écran */}
+        <Modal
+          visible={isModalVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={closeImageModal}
+        >
+          <View style={styles.modalOverlay}>
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={closeImageModal}
+            >
+              <Ionicons name="close" size={30} color="white" />
+            </TouchableOpacity>
+            {selectedImage && (
+              <Image
+                source={{ uri: selectedImage }}
+                style={styles.modalImage}
+                resizeMode="contain"
+              />
+            )}
+          </View>
+        </Modal>
       </SafeAreaView>
     );
   }
@@ -464,6 +724,12 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
   },
+  imageTouchable: {
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
   cardImage: {
     width: '100%',
     height: 200,
@@ -605,5 +871,43 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     textAlign: 'center',
+  },
+  downloadButton: {
+    backgroundColor: '#007AFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  downloadButtonDisabled: {
+    backgroundColor: '#999',
+  },
+  downloadButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCloseButton: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 20,
+    padding: 10,
+  },
+  modalImage: {
+    width: width * 0.9,
+    height: width * 0.9,
   },
 });

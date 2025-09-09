@@ -2,6 +2,7 @@ import React, { forwardRef, useImperativeHandle, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 import { WebView } from 'react-native-webview';
+import { cleanCodeFormulaire } from '../utils/fonctions';
 
 
 interface CarteRectoGeneratorProps {
@@ -20,11 +21,6 @@ const CarteRectoGenerator = forwardRef<CarteRectoGeneratorRef, CarteRectoGenerat
   ({ member, logoImage, photoImage, onImageGenerated, onError }, ref) => {
     const viewShotRef = useRef<ViewShot>(null);
     const webViewRef = useRef<WebView>(null);
-
-    const cleanCodeFormulaire = (code: string | null | undefined) => {
-      if (!code) return 'Non spécifié';
-      return code.replace(/^N°/, '');
-    };
 
     const generateHTML = (memberData: any, logoBase64?: string, photoUrl?: string, adhesionNumber?: string) => {
       const rectoHTML = `

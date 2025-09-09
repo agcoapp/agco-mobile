@@ -16,6 +16,7 @@ export interface User {
   statut: 'EN_ATTENTE' | 'APPROUVE' | 'REJETE';
   a_soumis_formulaire: boolean;
   est_actif: boolean;
+  selfie_photo_url?: string;
 }
 
 // Interface pour la réponse complète de getUserStatus

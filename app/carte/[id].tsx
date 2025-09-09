@@ -19,6 +19,7 @@ import {
 import CarteRectoGenerator, { CarteRectoGeneratorRef } from '../../components/CarteRectoGenerator';
 import CarteVersoGenerator, { CarteVersoGeneratorRef } from '../../components/CarteVersoGenerator';
 import { apiService } from '../../services/apiService';
+import { cleanCodeFormulaire } from '../../utils/fonctions';
 
 const { width } = Dimensions.get('window');
 
@@ -119,10 +120,6 @@ export default function CarteMembreScreen() {
 
     fetchMemberData();
   }, [id]);
-
-  const cleanCodeFormulaire = (code: string) => {
-    return code.replace(/^N°/, '').trim();
-  };
 
   const handleBack = () => {
     router.back();
