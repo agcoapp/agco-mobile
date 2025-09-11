@@ -6,21 +6,21 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  Image,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    Image,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View
 } from 'react-native';
 
 import AdhesionFormGenerator, { AdhesionFormGeneratorRef } from '../components/AdhesionFormGenerator';
@@ -232,7 +232,7 @@ export default function RegisterScreen() {
           {
             resize: {
               width: maxWidth,
-              height: Math.round((maxWidth * 4) / 3), // Ratio 3:4 par défaut
+              // Ne pas forcer la hauteur - préserver l'aspect ratio original
             },
           },
         ],

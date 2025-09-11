@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as ImageManipulator from 'expo-image-manipulator';
 import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -25,6 +24,7 @@ import CarteRectoGenerator, { CarteRectoGeneratorRef } from '../../components/Ca
 import CarteVersoGenerator, { CarteVersoGeneratorRef } from '../../components/CarteVersoGenerator';
 import { useAuth } from '../../hooks/useAuth';
 import { apiService } from '../../services/apiService';
+import { convertImageToBase64, convertImageToBase64WithTransparency } from '../../utils/fonctions';
 
 interface AdhesionForm {
   id: number;
@@ -253,72 +253,6 @@ export default function AdhesionsScreen() {
     }
   };
 
-  // Fonction pour convertir une image en base64 avec transparence (adaptée pour React Native)
-  const convertImageToBase64WithTransparency = async (imageUrl: string | any, maxWidth: number = 300, quality: number = 0.8, preserveTransparency: boolean = false): Promise<string> => {
-    try {
-      // Vérifier que imageUrl est défini
-      if (!imageUrl) {
-        throw new Error('URL d\'image non définie');
-      }
-      
-      // Déterminer si c'est une image externe (Cloudinary) ou locale
-      const isExternalImage = typeof imageUrl === 'string' && (imageUrl.startsWith('http') || imageUrl.startsWith('https'));
-      
-      
-      // Traiter l'image avec expo-image-manipulator
-      const processedImage = await ImageManipulator.manipulateAsync(
-        imageUrl,
-        [
-          {
-            resize: {
-              width: maxWidth,
-              height: Math.round((maxWidth * 4) / 3), // Ratio 3:4 par défaut
-            },
-          },
-        ],
-        {
-          compress: quality,
-          format: preserveTransparency ? ImageManipulator.SaveFormat.PNG : ImageManipulator.SaveFormat.JPEG,
-          base64: true,
-        }
-      );
-      
-      if (processedImage.base64) {
-        const format = preserveTransparency ? 'image/png' : 'image/jpeg';
-        return `data:${format};base64,${processedImage.base64}`;
-      } else {
-        throw new Error('Impossible de générer le base64');
-      }
-    } catch (error) {
-      // Ne pas logger l'erreur ici, elle sera gérée par convertImageToBase64
-      throw error;
-    }
-  };
-
-  // Fonction pour convertir une image en base64 (version simplifiée)
-  const convertImageToBase64 = async (imageUrl: string, maxWidth: number = 300, quality: number = 0.8): Promise<string> => {
-    try {
-      return await convertImageToBase64WithTransparency(imageUrl, maxWidth, quality, false);
-      } catch (error) {
-      // Si c'est une erreur 404 ou de chargement d'image, on peut continuer sans l'image
-      if (error instanceof Error && (
-        error.message.includes('404') || 
-        error.message.includes('Unknown image download error') ||
-        error.message.includes('Resource not found') ||
-        error.message.includes('Could not load the image')
-      )) {
-        // Log silencieux pour les erreurs 404 attendues
-        console.log('⚠️ Image non trouvée (404):', imageUrl);
-        throw new Error(`Image non trouvée: ${imageUrl}`);
-      }
-      
-      // Log complet pour les autres erreurs
-      console.error('❌ Erreur lors de la conversion de l\'image en base64:', error);
-      throw error;
-    }
-  };
-
-
   // Fonction pour générer la carte RECTO en utilisant le générateur
   const generateCardRecto = async (member: any): Promise<string> => {
     try {
@@ -327,16 +261,15 @@ export default function AdhesionsScreen() {
       let photoBase64 = '';
       
       try {
-        const { Image } = require('react-native');
-        const logoUri = Image.resolveAssetSource(require('../../assets/images/logo.png')).uri;
-        logoBase64 = await convertImageToBase64WithTransparency(logoUri, 200, 0.9, true);
+        const logoUri = require('../../assets/images/logo.png');
+        logoBase64 = await convertImageToBase64WithTransparency(logoUri, 250, 220, 0.9, true);
       } catch (error) {
         console.log('⚠️ Logo non trouvé:', error);
       }
       
       if (member.formulaire_actuel?.donnees_snapshot?.selfie_photo_url) {
         try {
-          photoBase64 = await convertImageToBase64(member.formulaire_actuel.donnees_snapshot.selfie_photo_url, 200, 0.8);
+          photoBase64 = await convertImageToBase64(member.formulaire_actuel.donnees_snapshot.selfie_photo_url, 160, 200, 0.8);
         } catch (error) {
           console.log('Photo non trouvée');
         }
@@ -380,7 +313,7 @@ export default function AdhesionsScreen() {
       if (presidentSignatureUrl) {
         try {
           console.log('🖼️ Conversion de la signature du président en cours...', presidentSignatureUrl);
-          signatureBase64 = await convertImageToBase64(presidentSignatureUrl, 250, 0.9);
+          signatureBase64 = await convertImageToBase64WithTransparency(presidentSignatureUrl, 280, 180, 0.9, true);
           console.log('✅ Signature du président convertie avec succès, taille:', signatureBase64.length);
         } catch (error) {
           console.log('⚠️ Signature du président non trouvée, génération sans signature');
@@ -495,9 +428,8 @@ export default function AdhesionsScreen() {
       let logoBase64 = '';
       
       try {
-        const { Image } = require('react-native');
-        const logoUri = Image.resolveAssetSource(require('../../assets/images/logo.png')).uri;
-        logoBase64 = await convertImageToBase64WithTransparency(logoUri, 150, 0.9, true);
+        const logoUri = require('../../assets/images/logo.png');
+        logoBase64 = await convertImageToBase64WithTransparency(logoUri, 250, 220, 0.9, true);
       } catch (error) {
         console.log('⚠️ Logo non trouvé:', error);
       }
@@ -559,9 +491,8 @@ export default function AdhesionsScreen() {
       let logoBase64 = '';
       
       try {
-        const { Image } = require('react-native');
-        const logoUri = Image.resolveAssetSource(require('../../assets/images/logo.png')).uri;
-        logoBase64 = await convertImageToBase64WithTransparency(logoUri, 150, 0.9, true);
+        const logoUri = require('../../assets/images/logo.png');
+        logoBase64 = await convertImageToBase64WithTransparency(logoUri, 250, 220, 0.9, true);
       } catch (error) {
         console.log('⚠️ Logo non trouvé:', error);
       }

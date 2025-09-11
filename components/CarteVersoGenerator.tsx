@@ -3,6 +3,7 @@ import React, { forwardRef, useImperativeHandle, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 import { WebView } from 'react-native-webview';
+import { convertImageToBase64WithTransparency } from '../utils/fonctions';
 
 // Fonction pour générer un QR code à partir d'une URL
 const generateQRCode = async (url: string): Promise<string> => {
@@ -10,7 +11,7 @@ const generateQRCode = async (url: string): Promise<string> => {
     console.log('🔄 Génération du QR code pour:', url);
     
     // Utiliser l'API QR Server pour générer le QR code
-    const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`;
+    const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(url)}`;  
     
     // Télécharger l'image QR code générée
     const downloadResult = await FileSystem.downloadAsync(
@@ -58,38 +59,38 @@ const CarteVersoGenerator = forwardRef<CarteVersoGeneratorRef, CarteVersoGenerat
 
     const generateHTML = (memberData: any, qrCodeBase64?: string, signatureUrl?: string) => {
       const versoHTML = `
-        <link rel="preconnect" href="https://fonts.googleapis.com">
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
-
-        <div style="width: 660px; height: 450px; background: #fefefe; border: 2px solid #ccc; position: relative; margin: 0 auto;">
+        <div style="width: 660px; height: 450px; background: #fefefe; border: 2px solid #ccc; position: relative; margin: 0 auto; box-sizing: border-box;">
           <!-- Main Section -->
-          <div style="position: absolute; width: 100%; height: 350px; top: 0; left: 0; background: #fefefe; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+          <div style="position: absolute; width: 100%; height: 350px; top: 0; left: 0; background: #fefefe; display: flex; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box;">
             <!-- Title -->
-            <div style="font-family: 'Inter, sans-serif'; font-weight: 700; color: #1b1b1b; font-size: 32px; line-height: normal; margin-bottom: 40px;">
+            <div style="font-family: 'Inter', sans-serif; font-weight: 700; color: #1b1b1b; font-size: 32px; line-height: normal; margin-bottom: 40px; text-align: center;">
               Le Président
             </div>
             
-            <div style="display: flex; width: 100%; justify-content: space-around; align-items: center; padding: 0 40px;">
+            <div style="display: flex; width: 100%; justify-content: space-around; align-items: center; padding: 0 33px; box-sizing: border-box; gap: 20px;">
               <!-- QR Code -->
               ${qrCodeBase64 ? 
-                `<img src="${qrCodeBase64}" alt="QR Code" style="width: 140px; height: 140px; object-fit: cover;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
-                 <div style="width: 140px; height: 140px; background: #f5f5f5; border: 1px solid #ccc; display: none; align-items: center; justify-content: center; font-size: 12px; color: #666; font-family: 'Inter, Helvetica';">QR Code</div>` : 
-                `<div style="width: 140px; height: 140px; background: #f5f5f5; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #666; font-family: 'Inter, Helvetica';">QR Code</div>`
+                `<div style="flex: 0 0 auto; width: 140px; height: 140px; position: relative;">
+                   <img src="${qrCodeBase64}" alt="QR Code" style="width: 100%; height: 100%; object-fit: contain; border: 1px solid #ddd;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                   <div style="width: 100%; height: 100%; background: #f5f5f5; border: 1px solid #ccc; display: none; align-items: center; justify-content: center; font-size: 12px; color: #666; font-family: 'Inter', Helvetica;">QR Code</div>
+                 </div>` : 
+                `<div style="flex: 0 0 auto; width: 140px; height: 140px; background: #f5f5f5; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #666; font-family: 'Inter', Helvetica;">QR Code</div>`
               }
               
               <!-- Sceau officiel et signature -->
               ${signatureUrl ? 
-                `<img src="${signatureUrl}" alt="Sceau officiel" style="width: 280px; height: 180px; object-fit: contain;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
-                 <div style="width: 280px; height: 180px; background: #f5f5f5; border: 1px solid #ccc; display: none; align-items: center; justify-content: center; font-size: 12px; color: #666; font-family: 'Inter, Helvetica';">Sceau officiel</div>` : 
-                `<div style="width: 280px; height: 180px; background: #f5f5f5; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #666; font-family: 'Inter, Helvetica';">Sceau officiel</div>`
+                `<div style="flex: 0 0 auto; width: 280px; height: 180px; position: relative;">
+                   <img src="${signatureUrl}" alt="Sceau officiel" style="width: 100%; height: 100%; object-fit: contain; border: 1px solid #ddd;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                   <div style="width: 100%; height: 100%; background: #f5f5f5; border: 1px solid #ccc; display: none; align-items: center; justify-content: center; font-size: 12px; color: #666; font-family: 'Inter', Helvetica;">Sceau officiel</div>
+                 </div>` : 
+                `<div style="flex: 0 0 auto; width: 280px; height: 180px; background: #f5f5f5; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #666; font-family: 'Inter', Helvetica;">Sceau officiel</div>`
               }
             </div>
           </div>
           
           <!-- Footer Section -->
-          <div style="position: absolute; width: 100%; height: 100px; bottom: 0; left: 0; background: #0d65c4; display: flex; align-items: center; justify-content: center;">
-            <div style="font-family: 'Inter'; font-weight: 700; color: white; font-size: 15px; line-height: 20px; text-align: center; max-width: 80%;">
+          <div style="position: absolute; width: 100%; height: 100px; bottom: 0; left: 0; background: #0d65c4; display: flex; align-items: center; justify-content: center; box-sizing: border-box;">
+            <div style="font-family: 'Inter'; font-weight: 700; color: white; font-size: 15px; line-height: 1.3; text-align: center; max-width: 90%; padding: 0 33px;">
               Il est demandé à toutes les autorités civiles, administratives<br/>
               et militaires d'apporter assistance et protection au porteur<br/>
               de la présente carte afin qu'il se rapproche de son Ambassade<br/>
@@ -99,7 +100,35 @@ const CarteVersoGenerator = forwardRef<CarteVersoGeneratorRef, CarteVersoGenerat
         </div>
       `;
 
-      return versoHTML;
+      return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carte de Membre - Verso</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 490px;
+            font-family: 'Inter', sans-serif;
+        }
+        * {
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    ${versoHTML}
+</body>
+</html>`;
     };
 
     const generatePNG = async (qrCodeBase64?: string, signatureUrl?: string, finalFormUrl?: string): Promise<string> => {
@@ -124,8 +153,14 @@ const CarteVersoGenerator = forwardRef<CarteVersoGeneratorRef, CarteVersoGenerat
           }
         }
 
+        // Résizer la signature
+        let signatureToUse = undefined;
+        if (finalSignatureUrl) {
+          signatureToUse = await convertImageToBase64WithTransparency(finalSignatureUrl, 280, 180, 0.9, true);
+        }
+
         // Générer le HTML avec les images
-        const htmlContent = generateHTML(member, qrCodeToUse, finalSignatureUrl);
+        const htmlContent = generateHTML(member, qrCodeToUse, signatureToUse);
         
         if (!viewShotRef.current) {
           throw new Error('ViewShot ref non disponible');
@@ -230,6 +265,7 @@ const styles = StyleSheet.create({
     height: 490,
     backgroundColor: 'white',
   },
+  
 });
 
 export default CarteVersoGenerator;
