@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -362,14 +361,6 @@ export default function CodesScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Ionicons name="arrow-back" size={24} color="#007AFF" />
-          <Text style={styles.backButtonText}>Retour</Text>
-        </TouchableOpacity>
-
         {['PRESIDENT', 'SECRETAIRE_GENERALE'].includes(user.role) && (
           <TouchableOpacity
             style={styles.createButton}

@@ -113,16 +113,6 @@ export default function ChangePasswordScreen() {
       <TouchableWithoutFeedback onPress={dismissKeyboard}>
         <View style={styles.container}>
           {/* Header */}
-          <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-              onPress={handleGoBack}
-          >
-              <Ionicons name="arrow-back" size={24} color="#007AFF" />
-            <Text style={styles.backButtonText}>Retour</Text>
-          </TouchableOpacity>
-        </View>
-
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
             <View style={styles.form}>
               <Text style={styles.title}>Changer le mot de passe</Text>

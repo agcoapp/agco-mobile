@@ -556,11 +556,6 @@ export default function MembresScreen() {
   return (
     <SafeAreaView style={styles.container}>
         <View style={styles.content}>
-        {/* Bouton de retour */}
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#007AFF" />
-          <Text style={styles.backButtonText}>Retour</Text>
-        </TouchableOpacity>
         
         {/* Titre */}
         <Text style={styles.title}>Gestion des Membres</Text>
@@ -617,14 +612,7 @@ export default function MembresScreen() {
             <FlatList
               data={searchedMembers}
               refreshControl={
-                <RefreshControl 
-                  refreshing={refreshing} 
-                  onRefresh={onRefresh}
-                  colors={['#007AFF']}
-                  tintColor="#007AFF"
-                  title="Actualisation..."
-                  titleColor="#666"
-                />
+                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
               }
               renderItem={renderMemberItem}
               keyExtractor={(item) => item.id.toString()}

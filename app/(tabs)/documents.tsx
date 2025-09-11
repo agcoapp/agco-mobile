@@ -700,13 +700,7 @@ export default function DocumentsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={styles.content}>
-          {/* Bouton de retour */}
-          <TouchableOpacity style={styles.backButton} onPress={handleBackNavigation}>
-            <Ionicons name="arrow-back" size={24} color="#007AFF" />
-            <Text style={styles.backButtonText}>Retour</Text>
-          </TouchableOpacity>
-          
+        <View style={styles.content}>          
           {/* Titre */}
           <Text style={styles.title}>Textes Officiels de l'association</Text>
 

@@ -761,9 +761,6 @@ export default function AdhesionsScreen() {
           <Text style={styles.errorText}>
             Vous n'avez pas les permissions nécessaires pour accéder à cette page.
           </Text>
-          <TouchableOpacity style={styles.backButton} onPress={handleBackNavigation}>
-            <Text style={styles.backButtonText}>Retour</Text>
-          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -864,13 +861,7 @@ export default function AdhesionsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        {/* Bouton de retour */}
-        <TouchableOpacity style={styles.backButton} onPress={handleBackNavigation}>
-          <Ionicons name="arrow-back" size={24} color="#007AFF" />
-          <Text style={styles.backButtonText}>Retour</Text>
-        </TouchableOpacity>
-        
+      <View style={styles.content}>        
         {/* Titre */}
         <Text style={styles.title}>Gestion des Adhésions</Text>
 
