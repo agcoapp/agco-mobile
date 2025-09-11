@@ -134,7 +134,7 @@ const CarteRectoGenerator = forwardRef<CarteRectoGeneratorRef, CarteRectoGenerat
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 100vh;
+            height: 490px;
             font-family: 'Inter', sans-serif;
         }
     </style>
