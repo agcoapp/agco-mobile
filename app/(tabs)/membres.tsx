@@ -555,7 +555,6 @@ export default function MembresScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.content}>
         {/* Bouton de retour */}
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -638,7 +637,6 @@ export default function MembresScreen() {
           )}
         </View>
         </View>
-      </TouchableWithoutFeedback>
 
       {/* Modal de confirmation de retrait */}
       <Modal

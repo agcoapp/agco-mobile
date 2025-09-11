@@ -264,7 +264,8 @@ export default function AdhesionsScreen() {
       let photoBase64 = '';
       
       try {
-        const logoUri = require('../../assets/images/logo.png');
+        const { Image } = require('react-native');
+        const logoUri = Image.resolveAssetSource(require('../../assets/images/logo.png')).uri;
         logoBase64 = await convertImageToBase64WithTransparency(logoUri, 250, 220, 0.9, true);
       } catch (error) {
         console.log('⚠️ Logo non trouvé:', error);
@@ -431,7 +432,8 @@ export default function AdhesionsScreen() {
       let logoBase64 = '';
       
       try {
-        const logoUri = require('../../assets/images/logo.png');
+        const { Image } = require('react-native');
+        const logoUri = Image.resolveAssetSource(require('../../assets/images/logo.png')).uri;
         logoBase64 = await convertImageToBase64WithTransparency(logoUri, 250, 220, 0.9, true);
       } catch (error) {
         console.log('⚠️ Logo non trouvé:', error);
@@ -494,7 +496,8 @@ export default function AdhesionsScreen() {
       let logoBase64 = '';
       
       try {
-        const logoUri = require('../../assets/images/logo.png');
+        const { Image } = require('react-native');
+        const logoUri = Image.resolveAssetSource(require('../../assets/images/logo.png')).uri
         logoBase64 = await convertImageToBase64WithTransparency(logoUri, 250, 220, 0.9, true);
       } catch (error) {
         console.log('⚠️ Logo non trouvé:', error);
