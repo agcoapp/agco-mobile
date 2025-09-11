@@ -58,6 +58,10 @@ export default function AdhesionsScreen() {
   const [selectedReason, setSelectedReason] = useState('');
   const [showReasonPicker, setShowReasonPicker] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  
+  // États pour la gestion des étapes de validation
+  const [validationStep, setValidationStep] = useState(0);
+  const [isValidating, setIsValidating] = useState(false);
 
   // Références aux générateurs
   const adhesionFormGeneratorRef = useRef<AdhesionFormGeneratorRef>(null);
@@ -71,6 +75,18 @@ export default function AdhesionsScreen() {
     { value: 'photo_illisible', label: 'Photo Non Conforme' },
     { value: 'autre', label: 'Autre Raison' }
   ];
+
+  // Fonction pour obtenir le texte des étapes de validation
+  const getValidationStepText = (step: number) => {
+    const steps = [
+      "1 - Récupération de la Signature du président",
+      "2 - Envoi de l'image de la fiche d'adhésion",
+      "3 - Envoi de l'image du Recto de la carte de membre",
+      "4 - Envoi de l'image du Verso de la carte de membre",
+      "5 - Finalisation (veuillez patienter)"
+    ];
+    return steps[step] || "";
+  };
 
   // Charger les formulaires d'adhésion
   useEffect(() => {
@@ -469,7 +485,8 @@ export default function AdhesionsScreen() {
 
   const handleValidateAdhesion = async (id: number) => {
     try {
-      setActionLoading(id);
+      setIsValidating(true);
+      setValidationStep(0);
       console.log('✅ Récupération de la Signature du président');
       
       // Récupérer la signature du président
@@ -504,6 +521,7 @@ export default function AdhesionsScreen() {
       }
 
       // Générer le PNG de la fiche d'adhésion avec la signature du président (sans numéro d'adhésion)
+      setValidationStep(1);
       console.log('🖼️ Génération du PNG de la fiche d\'adhésion...', specificAdhesion.formulaire_actuel.donnees_snapshot);
       const pngBase64 = await adhesionFormGeneratorRef.current?.generatePNG(
         logoBase64,
@@ -527,6 +545,7 @@ export default function AdhesionsScreen() {
       console.log('🔄 Génération des cartes RECTO et VERSO avec le numéro d\'adhésion...');
       
       // Générer la carte RECTO
+      setValidationStep(2);
       console.log('🖼️ Génération de la carte RECTO...');
       const rectoBase64 = await generateCardRecto(specificAdhesion);
       
@@ -537,6 +556,7 @@ export default function AdhesionsScreen() {
       console.log('✅ Carte RECTO uploadée:', rectoResult.url);
       
       // Générer la carte VERSO
+      setValidationStep(3);
       console.log('🖼️ Génération de la carte VERSO...');
       const versoBase64 = await generateCardVerso(specificAdhesion, presidentSignatureUrl, cloudinaryResult.url);
       
@@ -547,6 +567,7 @@ export default function AdhesionsScreen() {
       console.log('✅ Carte VERSO uploadée:', versoResult.url);
       
       // Appeler l'API pour approuver le formulaire avec les URLs des cartes
+      setValidationStep(4);
       console.log('📋 Appel de l\'API pour approuver le formulaire...');
       const result = await apiService.approveForm({
         id_utilisateur: id,
@@ -614,6 +635,10 @@ export default function AdhesionsScreen() {
       
       setAdhesions(updatedAdhesions);
       
+      // Réinitialiser les états de validation
+      setIsValidating(false);
+      setValidationStep(0);
+      
       Alert.alert(
         'Succès',
         'Adhésion validée avec succès !',
@@ -626,14 +651,17 @@ export default function AdhesionsScreen() {
       
     } catch (error: any) {
       console.error('❌ Erreur lors de la validation:', error);
+      
+      // Réinitialiser les états de validation en cas d'erreur
+      setIsValidating(false);
+      setValidationStep(0);
+      
       Alert.alert(
         'Erreur',
         error.message || 'Erreur lors de la validation de l\'adhésion',
         [{ text: 'OK' }]
       );
       // En cas d'erreur, ne pas fermer le modal pour permettre à l'utilisateur de corriger
-    } finally {
-      setActionLoading(null);
     }
   };
 
@@ -1004,33 +1032,47 @@ export default function AdhesionsScreen() {
         visible={showValidationModal}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setShowValidationModal(false)}
+        onRequestClose={() => !isValidating && setShowValidationModal(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Confirmer l'approbation</Text>
-            <Text style={styles.modalText}>
-              Êtes-vous sûr de vouloir approuver le formulaire de {selectedAdhesion?.nom_complet} ?
+            <Text style={styles.modalTitle}>
+              {isValidating ? 'Validation en cours...' : 'Confirmer l\'approbation'}
             </Text>
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setShowValidationModal(false)}
-              >
-                <Text style={styles.cancelButtonText}>Annuler</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.confirmButton]}
-                onPress={() => {
-                  if (selectedAdhesion) {
-                    handleValidateAdhesion(selectedAdhesion.id);
-                  }
-                  setShowValidationModal(false);
-                }}
-              >
-                <Text style={styles.confirmButtonText}>Approuver</Text>
-              </TouchableOpacity>
-            </View>
+            
+            {isValidating ? (
+              <View style={styles.validationContainer}>
+                <ActivityIndicator size="large" color="#007AFF" style={styles.validationLoader} />
+                <Text style={styles.validationStepText}>{getValidationStepText(validationStep)}</Text>
+                <Text style={styles.validationInfoText}>
+                  Veuillez patienter pendant la validation de l'adhésion...
+                </Text>
+              </View>
+            ) : (
+              <>
+                <Text style={styles.modalText}>
+                  Êtes-vous sûr de vouloir approuver le formulaire de {selectedAdhesion?.nom_complet} ?
+                </Text>
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.cancelButton]}
+                    onPress={() => setShowValidationModal(false)}
+                  >
+                    <Text style={styles.cancelButtonText}>Annuler</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.confirmButton]}
+                    onPress={() => {
+                      if (selectedAdhesion) {
+                        handleValidateAdhesion(selectedAdhesion.id);
+                      }
+                    }}
+                  >
+                    <Text style={styles.confirmButtonText}>Approuver</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </View>
         </View>
       </Modal>
@@ -1479,6 +1521,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: 'white',
+  },
+  // Styles pour la validation en cours
+  validationContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  validationLoader: {
+    marginBottom: 16,
+  },
+  validationStepText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#007AFF',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  validationInfoText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
      // Styles pour le picker de raisons
    pickerContainer: {
