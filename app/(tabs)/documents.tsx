@@ -1,10 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
-import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Keyboard,
   KeyboardAvoidingView,
@@ -22,24 +22,36 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useAuth } from '../../hooks/useAuth';
-import { apiService } from '../../services/apiService';
+import { useNavigationHistory } from '../../hooks/useNavigationHistory';
+import { apiService, CategorieTexteOfficiel, CreerCategorieTexteOfficielRequest, MettreAJourCategorieTexteOfficielRequest } from '../../services/apiService';
 
 
-// Interface pour les documents
+// Interface pour les documents (adaptée aux données de l'API TexteOfficiel)
 interface Document {
   id: number;
   titre: string;
   description?: string;
-  telecharge_le: string;
-  type_document: string;
+  telecharge_le?: string;
+  modifie_le?: string;
+  categorie: {
+    id: number;
+    nom: string;
+    description?: string;
+  };
   url_cloudinary: string;
   cloudinary_id?: string;
   nom_fichier_original: string;
-  est_actif: boolean;
+  taille_fichier?: number;
+  telecharge_par?: {
+    prenoms: string;
+    nom: string;
+    role: string;
+  };
 }
 
 export default function DocumentsScreen() {
   const { user } = useAuth();
+  const { handleBackNavigation } = useNavigationHistory();
   const [mounted, setMounted] = useState(false);
   const [tabValue, setTabValue] = useState(0);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
@@ -50,7 +62,7 @@ export default function DocumentsScreen() {
   const [uploadForm, setUploadForm] = useState({
     title: '',
     description: '',
-    category: 'pv' as 'pv' | 'comptesRendus' | 'decisions' | 'reglement',
+    categoryId: 0,
     selectedFile: null as DocumentPicker.DocumentPickerAsset | null,
     fileName: '',
     fileSize: 0
@@ -64,20 +76,27 @@ export default function DocumentsScreen() {
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const [refreshing, setRefreshing] = useState(false);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
-  const [documents, setDocuments] = useState<{
-    pv: Document[];
-    comptesRendus: Document[];
-    decisions: Document[];
-    reglement: Document | null;
-  }>({
-    pv: [],
-    comptesRendus: [],
-    decisions: [],
-    reglement: null
-  });
+  const [categories, setCategories] = useState<CategorieTexteOfficiel[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [documents, setDocuments] = useState<Record<number, Document[]>>({});
   const [documentsLoading, setDocumentsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  // États pour la gestion des catégories
+  const [showNewCategoryModal, setShowNewCategoryModal] = useState(false);
+  const [showEditCategoryModal, setShowEditCategoryModal] = useState(false);
+  const [categoryToEdit, setCategoryToEdit] = useState<CategorieTexteOfficiel | null>(null);
+  const [newCategoryForm, setNewCategoryForm] = useState({
+    nom: '',
+    description: ''
+  });
+  const [editCategoryForm, setEditCategoryForm] = useState({
+    nom: '',
+    description: ''
+  });
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const [isUpdatingCategory, setIsUpdatingCategory] = useState(false);
 
   // Vérifier que le composant est monté côté client
   useEffect(() => {
@@ -149,38 +168,60 @@ export default function DocumentsScreen() {
     return { message, details };
   };
 
-  const loadDocuments = useCallback(async (showLoading = true) => {
+  // Fonction utilitaire pour recharger toutes les données
+  const reloadAllData = useCallback(async (showLoading = false) => {
     try {
       if (showLoading) {
+        setCategoriesLoading(true);
         setDocumentsLoading(true);
       }
-      const response = await apiService.getTextesOfficiels();
-      const allDocuments = response.documents;
       
-      const categorizedDocuments = {
-        pv: allDocuments.filter((doc: any) => doc.type_document === 'PV_REUNION').sort((a: any, b: any) => 
-          new Date(b.telecharge_le).getTime() - new Date(a.telecharge_le).getTime()
-        ) as Document[],
-        comptesRendus: allDocuments.filter((doc: any) => doc.type_document === 'COMPTE_RENDU').sort((a: any, b: any) => 
-          new Date(b.telecharge_le).getTime() - new Date(a.telecharge_le).getTime()
-        ) as Document[],
-        decisions: allDocuments.filter((doc: any) => doc.type_document === 'DECISION').sort((a: any, b: any) => 
-          new Date(b.telecharge_le).getTime() - new Date(a.telecharge_le).getTime()
-        ) as Document[],
-        reglement: allDocuments.find((doc: any) => doc.type_document === 'REGLEMENT_INTERIEUR') as Document | null
-      };
+      const response = await apiService.getCategoriesTexteOfficiel();
+      const loadedCategories = response.donnees.categories;
+      setCategories(loadedCategories);
+      
+      const documentsResponse = await apiService.getTextesOfficiels();
+      const allDocuments = documentsResponse.documents;
+      
+      // Organiser les documents par catégorie
+      const categorizedDocuments: Record<number, Document[]> = {};
+      
+      // Initialiser toutes les catégories avec des tableaux vides
+      loadedCategories.forEach(category => {
+        categorizedDocuments[category.id] = [];
+      });
+      
+      // Distribuer les documents dans leurs catégories respectives
+      allDocuments.forEach((doc: any) => {
+        if (doc.categorie && doc.categorie.id) {
+          const categoryId = doc.categorie.id;
+          if (categorizedDocuments[categoryId]) {
+            categorizedDocuments[categoryId].push(doc as Document);
+          }
+        }
+      });
+      
+      // Trier les documents par date de téléchargement (plus récent en premier)
+      Object.keys(categorizedDocuments).forEach(categoryId => {
+        categorizedDocuments[parseInt(categoryId)].sort((a, b) => {
+          const dateA = a.telecharge_le ? new Date(a.telecharge_le).getTime() : 0;
+          const dateB = b.telecharge_le ? new Date(b.telecharge_le).getTime() : 0;
+          return dateB - dateA;
+        });
+      });
       
       setDocuments(categorizedDocuments);
     } catch (error: any) {
-      console.error('Erreur lors du chargement des documents:', error);
+      console.error('Erreur lors du rechargement des données:', error);
       
-      const errorInfo = extractErrorMessage(error, 'Erreur lors du chargement des documents.');
+      const errorInfo = extractErrorMessage(error, 'Erreur lors du rechargement des données.');
       setToastMessage(errorInfo.message);
       setErrorDetails(errorInfo.details);
       setToastType('error');
       setShowToast(true);
     } finally {
       if (showLoading) {
+        setCategoriesLoading(false);
         setDocumentsLoading(false);
       }
     }
@@ -189,23 +230,150 @@ export default function DocumentsScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await loadDocuments(false); // Recharger sans afficher le loading
+      await reloadAllData(false); // Recharger sans afficher le loading
     } catch (error) {
       console.error('Erreur lors du rafraîchissement:', error);
     } finally {
       setRefreshing(false);
     }
-  }, [loadDocuments]);
+  }, [reloadAllData]);
 
-  // Charger les documents depuis localStorage au montage du composant
+  // Charger les documents au montage du composant
   useEffect(() => {
     if (mounted) {
-      loadDocuments(true);
+      reloadAllData(true);
     }
-  }, [mounted, loadDocuments]);
+  }, [mounted, reloadAllData]);
 
   const handleTabChange = (newValue: number) => {
     setTabValue(newValue);
+  };
+
+  // Fonctions pour la gestion des catégories
+  const handleCreateCategory = async () => {
+    if (!newCategoryForm.nom.trim()) {
+      setToastMessage('Le nom de la catégorie est requis.');
+      setToastType('error');
+      setShowToast(true);
+      return;
+    }
+
+    try {
+      setIsCreatingCategory(true);
+      const request: CreerCategorieTexteOfficielRequest = {
+        nom: newCategoryForm.nom.trim(),
+        description: newCategoryForm.description.trim() || undefined
+      };
+      
+      await apiService.createCategorieTexteOfficiel(request);
+      
+      setToastMessage('Catégorie créée avec succès.');
+      setToastType('success');
+      setShowToast(true);
+      
+      // Réinitialiser le formulaire et fermer la modale
+      setNewCategoryForm({ nom: '', description: '' });
+      setShowNewCategoryModal(false);
+      
+      // Recharger les catégories et documents
+      await reloadAllData(false);
+    } catch (error: any) {
+      console.error('Erreur lors de la création de la catégorie:', error);
+      
+      const errorInfo = extractErrorMessage(error, 'Erreur lors de la création de la catégorie.');
+      setToastMessage(errorInfo.message);
+      setErrorDetails(errorInfo.details);
+      setToastType('error');
+      setShowToast(true);
+    } finally {
+      setIsCreatingCategory(false);
+    }
+  };
+
+  const handleEditCategory = async () => {
+    if (!categoryToEdit || !editCategoryForm.nom.trim()) {
+      setToastMessage('Le nom de la catégorie est requis.');
+      setToastType('error');
+      setShowToast(true);
+      return;
+    }
+
+    try {
+      setIsUpdatingCategory(true);
+      const request: MettreAJourCategorieTexteOfficielRequest = {
+        nom: editCategoryForm.nom.trim(),
+        description: editCategoryForm.description.trim() || undefined
+      };
+      
+      await apiService.updateCategorieTexteOfficiel(categoryToEdit.id, request);
+      
+      setToastMessage('Catégorie modifiée avec succès.');
+      setToastType('success');
+      setShowToast(true);
+      
+      // Fermer la modale
+      setShowEditCategoryModal(false);
+      setCategoryToEdit(null);
+      
+      // Recharger les catégories et documents
+      await reloadAllData(false);
+    } catch (error: any) {
+      console.error('Erreur lors de la modification de la catégorie:', error);
+      
+      const errorInfo = extractErrorMessage(error, 'Erreur lors de la modification de la catégorie.');
+      setToastMessage(errorInfo.message);
+      setErrorDetails(errorInfo.details);
+      setToastType('error');
+      setShowToast(true);
+    } finally {
+      setIsUpdatingCategory(false);
+    }
+  };
+
+  const handleDeleteCategory = async (categoryId: number) => {
+    Alert.alert(
+      'Confirmer la suppression',
+      'Êtes-vous sûr de vouloir supprimer cette catégorie ? Cette action est irréversible.',
+      [
+        {
+          text: 'Annuler',
+          style: 'cancel',
+        },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await apiService.deleteCategorieTexteOfficiel(categoryId);
+              
+              setToastMessage('Catégorie supprimée avec succès.');
+              setToastType('success');
+              setShowToast(true);
+              
+              // Recharger les catégories et documents
+              await reloadAllData(false);
+            } catch (error: any) {
+              console.error('Erreur lors de la suppression de la catégorie:', error);
+              
+              const errorInfo = extractErrorMessage(error, 'Erreur lors de la suppression de la catégorie.');
+              setToastMessage(errorInfo.message);
+              setErrorDetails(errorInfo.details);
+              setToastType('error');
+              setShowToast(true);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const openEditCategoryModal = (category: CategorieTexteOfficiel) => {
+    setCategoryToEdit(category);
+    setEditCategoryForm({
+      nom: category.nom,
+      description: category.description || ''
+    });
+    setShowEditCategoryModal(true);
   };
 
   const handleViewDocument = (document: Document) => {
@@ -273,9 +441,13 @@ export default function DocumentsScreen() {
     const cloudName = 'dtqxhyqtp'; // Votre cloud name Cloudinary
     const uploadPreset = 'sgm_preset_textes_officiels'; // Votre upload preset
     
+    // Trouver la catégorie sélectionnée
+    const selectedCategory = categories.find(cat => cat.id === uploadForm.categoryId);
+    const categoryName = selectedCategory?.nom || 'general';
+    
     // Créer le nom du fichier avec timestamp
     const timestamp = Date.now();
-    const fileName = `texte_officiel_${uploadForm.category}_${timestamp}.pdf`;
+    const fileName = `texte_officiel_${categoryName.replace(/\s+/g, '_')}_${timestamp}.pdf`;
     
     // URL d'upload Cloudinary
     const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/upload`;
@@ -288,7 +460,7 @@ export default function DocumentsScreen() {
       name: fileName,
     } as any);
     formData.append('upload_preset', uploadPreset);
-    formData.append('public_id', `${uploadForm.category}/${fileName}`);
+    formData.append('public_id', `${categoryName.replace(/\s+/g, '_')}/${fileName}`);
     formData.append('resource_type', 'raw');
     
     console.log('Upload vers Cloudinary en cours...');
@@ -319,7 +491,8 @@ export default function DocumentsScreen() {
   };
 
   // Fonction de formatage des dates avec heure
-  const formatDateWithTime = (dateString: string) => {
+  const formatDateWithTime = (dateString?: string) => {
+    if (!dateString) return 'Date inconnue';
     const date = new Date(dateString);
     const dateFormatted = date.toLocaleDateString('fr-FR', {
       year: 'numeric',
@@ -352,13 +525,15 @@ export default function DocumentsScreen() {
 
     if (dateFilter) {
       filtered = filtered.filter(doc => 
-        new Date(doc.telecharge_le).toISOString().startsWith(dateFilter)
+        doc.telecharge_le && new Date(doc.telecharge_le).toISOString().startsWith(dateFilter)
       );
     }
     
-    return filtered.sort((a, b) => 
-      new Date(b.telecharge_le).getTime() - new Date(a.telecharge_le).getTime()
-    );
+    return filtered.sort((a, b) => {
+      const dateA = a.telecharge_le ? new Date(a.telecharge_le).getTime() : 0;
+      const dateB = b.telecharge_le ? new Date(b.telecharge_le).getTime() : 0;
+      return dateB - dateA;
+    });
   };
 
   // Fonction pour effacer tous les filtres
@@ -391,7 +566,7 @@ export default function DocumentsScreen() {
     setUploadForm({
       title: '',
       description: '',
-      category: 'pv',
+      categoryId: 0,
       selectedFile: null,
       fileName: '',
       fileSize: 0
@@ -415,7 +590,7 @@ export default function DocumentsScreen() {
           try {
             await apiService.deleteTexteOfficiel(documentToDelete.id);
             
-            loadDocuments(false);
+            reloadAllData(false);
             setDocumentToDelete(null);
             setDeletedDocument(null);
             
@@ -444,8 +619,8 @@ export default function DocumentsScreen() {
   };
 
   const handleUploadSubmit = async () => {
-    if (!uploadForm.title.trim() || !uploadForm.description.trim() || !uploadForm.selectedFile) {
-      setToastMessage('Veuillez remplir tous les champs et sélectionner un fichier PDF.');
+    if (!uploadForm.title.trim() || !uploadForm.description.trim() || !uploadForm.selectedFile || !uploadForm.categoryId) {
+      setToastMessage('Veuillez remplir tous les champs et sélectionner une catégorie.');
       setToastType('error');
       setShowToast(true);
       return;
@@ -454,6 +629,15 @@ export default function DocumentsScreen() {
     try {
       setIsUploading(true);
       
+      // Trouver la catégorie sélectionnée
+      const selectedCategory = categories.find(cat => cat.id === uploadForm.categoryId);
+      if (!selectedCategory) {
+        setToastMessage('Catégorie sélectionnée non trouvée.');
+        setToastType('error');
+        setShowToast(true);
+        return;
+      }
+
       // 1. D'abord uploader vers Cloudinary
       const cloudinaryData = await uploadToCloudinary(uploadForm.selectedFile);
       
@@ -461,9 +645,7 @@ export default function DocumentsScreen() {
       const newDocumentData = {
         titre: uploadForm.title,
         description: uploadForm.description,
-        type_document: (uploadForm.category === 'pv' ? 'PV_REUNION' : 
-                      uploadForm.category === 'comptesRendus' ? 'COMPTE_RENDU' :
-                      uploadForm.category === 'decisions' ? 'DECISION' : 'REGLEMENT_INTERIEUR') as 'PV_REUNION' | 'COMPTE_RENDU' | 'DECISION' | 'REGLEMENT_INTERIEUR',
+        id_categorie: selectedCategory.id,
         url_cloudinary: cloudinaryData.cloudinaryUrl,
         cloudinary_id: cloudinaryData.cloudinaryId,
         nom_fichier_original: cloudinaryData.fileName,
@@ -472,18 +654,16 @@ export default function DocumentsScreen() {
 
       await apiService.createTexteOfficiel(newDocumentData);
 
-      const tabIndexMap = {
-        'pv': 0,
-        'comptesRendus': 1,
-        'decisions': 2,
-        'reglement': 3
-      };
-      setTabValue(tabIndexMap[uploadForm.category]);
+      // Basculer vers l'onglet concerné
+      const categoryIndex = categories.findIndex(cat => cat.id === uploadForm.categoryId);
+      if (categoryIndex !== -1) {
+        setTabValue(categoryIndex);
+      }
 
       setNewlyAddedDocument(newDocumentData.titre);
-      await loadDocuments(false);
+      await reloadAllData(false);
 
-      setToastMessage('Texte officiel ajouté !');
+      setToastMessage('Document ajouté !');
       setToastType('success');
       setShowToast(true);
 
@@ -506,7 +686,7 @@ export default function DocumentsScreen() {
   };
 
   // Afficher un indicateur de chargement
-  if (documentsLoading) {
+  if (categoriesLoading || documentsLoading) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
@@ -522,7 +702,7 @@ export default function DocumentsScreen() {
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.content}>
           {/* Bouton de retour */}
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <TouchableOpacity style={styles.backButton} onPress={handleBackNavigation}>
             <Ionicons name="arrow-back" size={24} color="#007AFF" />
             <Text style={styles.backButtonText}>Retour</Text>
           </TouchableOpacity>
@@ -554,224 +734,94 @@ export default function DocumentsScreen() {
             )}
           </View>
 
-          {/* Onglets */}
+          {/* Onglets dynamiques basés sur les catégories */}
           <View style={styles.tabsContainer}>
-            <TouchableOpacity
-              style={[styles.tab, tabValue === 0 && styles.activeTab]}
-              onPress={() => handleTabChange(0)}
-            >
-              <Text style={[styles.tabText, tabValue === 0 && styles.activeTabText]}>
-                PV de réunions
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, tabValue === 1 && styles.activeTab]}
-              onPress={() => handleTabChange(1)}
-            >
-              <Text style={[styles.tabText, tabValue === 1 && styles.activeTabText]}>
-                Comptes rendus
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, tabValue === 2 && styles.activeTab]}
-              onPress={() => handleTabChange(2)}
-            >
-              <Text style={[styles.tabText, tabValue === 2 && styles.activeTabText]}>
-                Décisions
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, tabValue === 3 && styles.activeTab]}
-              onPress={() => handleTabChange(3)}
-            >
-              <Text style={[styles.tabText, tabValue === 3 && styles.activeTabText]}>
-                Règlement intérieur
-          </Text>
-            </TouchableOpacity>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {categories.map((category, index) => (
+                <TouchableOpacity
+                  key={category.id}
+                  style={[styles.tab, tabValue === index && styles.activeTab]}
+                  onPress={() => handleTabChange(index)}
+                >
+                  <Text style={[styles.tabText, tabValue === index && styles.activeTabText]}>
+                    {category.nom}
+                  </Text>
+                  <Text style={[styles.tabCount, tabValue === index && styles.activeTabCount]}>
+                    ({documents[category.id]?.length || 0})
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            
+            {/* Bouton pour ajouter une nouvelle catégorie */}
+            {user?.role === 'SECRETAIRE_GENERALE' && (
+              <TouchableOpacity
+                style={styles.addCategoryButton}
+                onPress={() => setShowNewCategoryModal(true)}
+              >
+                <Ionicons name="add" size={20} color="#007AFF" />
+              </TouchableOpacity>
+            )}
           </View>
 
-          {/* Contenu des onglets */}
+          {/* Contenu des onglets dynamiques */}
           <View style={styles.tabContent}>
-            {tabValue === 0 && (
-              <View>
-                <Text style={styles.tabTitle}>
-                  PV de réunions ({documents.pv.length})
-                </Text>
-                <FlatList
-                  data={filterDocuments(documents.pv)}
-                  refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-                  }
-                  renderItem={({ item }) => (
-                    <View style={[styles.documentItem, getListItemStyles(item.titre)]}>
-                      <View style={styles.documentIcon}>
-              <Ionicons name="document-outline" size={24} color="#007AFF" />
-                      </View>
-                      <View style={styles.documentInfo}>
-                        <Text style={styles.documentTitle}>{item.titre}</Text>
-                        <Text style={styles.documentDescription}>{item.description}</Text>
-                        <Text style={styles.documentDate}>
-                          Téléversé {formatDateWithTime(item.telecharge_le)}
+            {categories.map((category, index) => (
+              tabValue === index && (
+                <View key={category.id}>
+                  <View style={styles.tabHeader}>
+                    <View style={styles.tabHeaderLeft}>
+                      <Text style={styles.tabTitle}>
+                        {category.nom}
+                      </Text>
+                      {category.description && (
+                        <Text style={styles.tabDescription}>
+                          {category.description}
                         </Text>
-                      </View>
-                      <View style={styles.documentActions}>
-                        <TouchableOpacity
-                          style={styles.viewButton}
-                          onPress={() => handleViewDocument(item)}
-                        >
-                          <Ionicons name="eye-outline" size={16} color="#007AFF" />
-                          <Text style={styles.viewButtonText}>Voir</Text>
-                        </TouchableOpacity>
-                        {user?.role === 'SECRETAIRE_GENERALE' && (
+                      )}
+                    </View>
+                    
+                    <View style={styles.tabHeaderRight}>
+                      {(searchTerm || dateFilter) && (
+                        <Text style={styles.filterResults}>
+                          {filterDocuments(documents[category.id] || []).length} résultat{filterDocuments(documents[category.id] || []).length > 1 ? 's' : ''} trouvé{filterDocuments(documents[category.id] || []).length > 1 ? 's' : ''}
+                          {dateFilter && (
+                            <Text> pour le {new Date(dateFilter).toLocaleDateString('fr-FR')}</Text>
+                          )}
+                        </Text>
+                      )}
+                      
+                      {/* Boutons de gestion de catégorie */}
+                      {user?.role === 'SECRETAIRE_GENERALE' && (
+                        <View style={styles.categoryActions}>
                           <TouchableOpacity
-                            style={styles.deleteButton}
-                            onPress={() => handleDeleteDocument(item)}
+                            style={styles.editCategoryButton}
+                            onPress={() => openEditCategoryModal(category)}
+                          >
+                            <Ionicons name="create-outline" size={16} color="#007AFF" />
+                            <Text style={styles.editCategoryButtonText}>Modifier</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.deleteCategoryButton}
+                            onPress={() => handleDeleteCategory(category.id)}
                           >
                             <Ionicons name="trash-outline" size={16} color="#FF3B30" />
-                            <Text style={styles.deleteButtonText}>Supprimer</Text>
+                            <Text style={styles.deleteCategoryButtonText}>Supprimer</Text>
                           </TouchableOpacity>
-                        )}
-                      </View>
+                        </View>
+                      )}
                     </View>
-                  )}
-                  keyExtractor={(item) => item.id.toString()}
-                  showsVerticalScrollIndicator={false}
-                />
-                {filterDocuments(documents.pv).length === 0 && (
-                  <View style={styles.emptyContainer}>
-                    <Text style={styles.emptyText}>
-                      Aucun procès-verbal disponible pour le moment
-                    </Text>
                   </View>
-                )}
-            </View>
-            )}
-
-            {tabValue === 1 && (
-              <View>
-                <Text style={styles.tabTitle}>
-                  Comptes rendus ({documents.comptesRendus.length})
-                </Text>
-                <FlatList
-                  data={filterDocuments(documents.comptesRendus)}
-                  refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-                  }
-                  renderItem={({ item }) => (
-                    <View style={[styles.documentItem, getListItemStyles(item.titre)]}>
-                      <View style={styles.documentIcon}>
-              <Ionicons name="newspaper-outline" size={24} color="#34C759" />
-                      </View>
-                      <View style={styles.documentInfo}>
-                        <Text style={styles.documentTitle}>{item.titre}</Text>
-                        <Text style={styles.documentDescription}>{item.description}</Text>
-                        <Text style={styles.documentDate}>
-                          Téléversé {formatDateWithTime(item.telecharge_le)}
-                        </Text>
-                      </View>
-                      <View style={styles.documentActions}>
-                        <TouchableOpacity
-                          style={styles.viewButton}
-                          onPress={() => handleViewDocument(item)}
-                        >
-                          <Ionicons name="eye-outline" size={16} color="#007AFF" />
-                          <Text style={styles.viewButtonText}>Voir</Text>
-                        </TouchableOpacity>
-                        {user?.role === 'SECRETAIRE_GENERALE' && (
-                          <TouchableOpacity
-                            style={styles.deleteButton}
-                            onPress={() => handleDeleteDocument(item)}
-                          >
-                            <Ionicons name="trash-outline" size={16} color="#FF3B30" />
-                            <Text style={styles.deleteButtonText}>Supprimer</Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    </View>
-                  )}
-                  keyExtractor={(item) => item.id.toString()}
-                  showsVerticalScrollIndicator={false}
-                />
-                {filterDocuments(documents.comptesRendus).length === 0 && (
-                  <View style={styles.emptyContainer}>
-                    <Text style={styles.emptyText}>
-                      Aucun compte rendu disponible pour le moment
-                    </Text>
-                  </View>
-                )}
-              </View>
-            )}
-
-            {tabValue === 2 && (
-              <View>
-                <Text style={styles.tabTitle}>
-                  Décisions ({documents.decisions.length})
-                </Text>
-                <FlatList
-                  data={filterDocuments(documents.decisions)}
-                  refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-                  }
-                  renderItem={({ item }) => (
-                    <View style={[styles.documentItem, getListItemStyles(item.titre)]}>
-                      <View style={styles.documentIcon}>
-                        <Ionicons name="hammer-outline" size={24} color="#FF9500" />
-                      </View>
-                      <View style={styles.documentInfo}>
-                        <Text style={styles.documentTitle}>{item.titre}</Text>
-                        <Text style={styles.documentDescription}>{item.description}</Text>
-                        <Text style={styles.documentDate}>
-                          Téléversé {formatDateWithTime(item.telecharge_le)}
-                        </Text>
-                      </View>
-                      <View style={styles.documentActions}>
-                        <TouchableOpacity
-                          style={styles.viewButton}
-                          onPress={() => handleViewDocument(item)}
-                        >
-                          <Ionicons name="eye-outline" size={16} color="#007AFF" />
-                          <Text style={styles.viewButtonText}>Voir</Text>
-                        </TouchableOpacity>
-                        {user?.role === 'SECRETAIRE_GENERALE' && (
-                          <TouchableOpacity
-                            style={styles.deleteButton}
-                            onPress={() => handleDeleteDocument(item)}
-                          >
-                            <Ionicons name="trash-outline" size={16} color="#FF3B30" />
-                            <Text style={styles.deleteButtonText}>Supprimer</Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    </View>
-                  )}
-                  keyExtractor={(item) => item.id.toString()}
-                  showsVerticalScrollIndicator={false}
-                />
-                {filterDocuments(documents.decisions).length === 0 && (
-                  <View style={styles.emptyContainer}>
-                    <Text style={styles.emptyText}>
-                      Aucune décision disponible pour le moment
-                    </Text>
-                  </View>
-                )}
-              </View>
-            )}
-
-            {tabValue === 3 && (
-              <View>
-                <Text style={styles.tabTitle}>
-                  Règlement intérieur ({documents.reglement ? 1 : 0})
-                </Text>
-                {documents.reglement ? (
+                  
                   <FlatList
-                    data={filterDocuments([documents.reglement])}
+                    data={filterDocuments(documents[category.id] || [])}
                     refreshControl={
                       <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                     }
                     renderItem={({ item }) => (
                       <View style={[styles.documentItem, getListItemStyles(item.titre)]}>
                         <View style={styles.documentIcon}>
-                          <Ionicons name="book-outline" size={24} color="#AF52DE" />
+                          <Ionicons name="document-outline" size={24} color="#007AFF" />
                         </View>
                         <View style={styles.documentInfo}>
                           <Text style={styles.documentTitle}>{item.titre}</Text>
@@ -803,15 +853,16 @@ export default function DocumentsScreen() {
                     keyExtractor={(item) => item.id.toString()}
                     showsVerticalScrollIndicator={false}
                   />
-                ) : (
-                  <View style={styles.emptyContainer}>
-                    <Text style={styles.emptyText}>
-                      Aucun règlement intérieur disponible pour le moment
-                    </Text>
-                  </View>
-                )}
-              </View>
-            )}
+                  {filterDocuments(documents[category.id] || []).length === 0 && (
+                    <View style={styles.emptyContainer}>
+                      <Text style={styles.emptyText}>
+                        Aucun document disponible dans cette catégorie
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )
+            ))}
           </View>
         </View>
       </TouchableWithoutFeedback>
@@ -902,40 +953,21 @@ export default function DocumentsScreen() {
                   numberOfLines={3}
                 />
                 <Text style={styles.categoryLabel}>Catégorie :</Text>
-                <View style={styles.categoryButtons}>
-                  <TouchableOpacity
-                    style={[styles.categoryButton, uploadForm.category === 'pv' && styles.activeCategoryButton]}
-                    onPress={() => setUploadForm(prev => ({ ...prev, category: 'pv' }))}
-                  >
-                    <Text style={[styles.categoryButtonText, uploadForm.category === 'pv' && styles.activeCategoryButtonText]}>
-                      PV de réunions
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.categoryButton, uploadForm.category === 'comptesRendus' && styles.activeCategoryButton]}
-                    onPress={() => setUploadForm(prev => ({ ...prev, category: 'comptesRendus' }))}
-                  >
-                    <Text style={[styles.categoryButtonText, uploadForm.category === 'comptesRendus' && styles.activeCategoryButtonText]}>
-                      Comptes rendus
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.categoryButton, uploadForm.category === 'decisions' && styles.activeCategoryButton]}
-                    onPress={() => setUploadForm(prev => ({ ...prev, category: 'decisions' }))}
-                  >
-                    <Text style={[styles.categoryButtonText, uploadForm.category === 'decisions' && styles.activeCategoryButtonText]}>
-                      Décisions
-                    </Text>
-                  </TouchableOpacity>
-          <TouchableOpacity
-                    style={[styles.categoryButton, uploadForm.category === 'reglement' && styles.activeCategoryButton]}
-                    onPress={() => setUploadForm(prev => ({ ...prev, category: 'reglement' }))}
-          >
-                    <Text style={[styles.categoryButtonText, uploadForm.category === 'reglement' && styles.activeCategoryButtonText]}>
-                      Règlement intérieur
-                    </Text>
-          </TouchableOpacity>
-        </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScrollView}>
+                  <View style={styles.categoryButtons}>
+                    {categories.map((category) => (
+                      <TouchableOpacity
+                        key={category.id}
+                        style={[styles.categoryButton, uploadForm.categoryId === category.id && styles.activeCategoryButton]}
+                        onPress={() => setUploadForm(prev => ({ ...prev, categoryId: category.id }))}
+                      >
+                        <Text style={[styles.categoryButtonText, uploadForm.categoryId === category.id && styles.activeCategoryButtonText]}>
+                          {category.nom}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
                  
                  {/* Section d'upload de fichier PDF */}
                  <Text style={styles.uploadSectionTitle}>Fichier PDF :</Text>
@@ -978,9 +1010,9 @@ export default function DocumentsScreen() {
                   <Text style={styles.cancelButtonText}>Annuler</Text>
                 </TouchableOpacity>
                  <TouchableOpacity 
-                   style={[styles.submitButton, (!uploadForm.title.trim() || !uploadForm.description.trim() || !uploadForm.selectedFile || isUploading) && styles.disabledButton]} 
+                   style={[styles.submitButton, (!uploadForm.title.trim() || !uploadForm.description.trim() || !uploadForm.selectedFile || !uploadForm.categoryId || isUploading) && styles.disabledButton]} 
                    onPress={handleUploadSubmit}
-                   disabled={!uploadForm.title.trim() || !uploadForm.description.trim() || !uploadForm.selectedFile || isUploading}
+                   disabled={!uploadForm.title.trim() || !uploadForm.description.trim() || !uploadForm.selectedFile || !uploadForm.categoryId || isUploading}
                  >
                   {isUploading ? (
                     <ActivityIndicator size="small" color="white" />
@@ -1039,6 +1071,147 @@ export default function DocumentsScreen() {
             </View>
           </View>
         </View>
+      </Modal>
+
+      {/* Modal pour ajouter une nouvelle catégorie */}
+      <Modal
+        visible={showNewCategoryModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => {
+          setShowNewCategoryModal(false);
+          setNewCategoryForm({ nom: '', description: '' });
+        }}
+      >
+        <KeyboardAvoidingView 
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Nouvelle catégorie</Text>
+                <TouchableOpacity onPress={() => {
+                  setShowNewCategoryModal(false);
+                  setNewCategoryForm({ nom: '', description: '' });
+                }}>
+                  <Ionicons name="close" size={24} color="#666" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={styles.modalBody}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Nom de la catégorie"
+                  value={newCategoryForm.nom}
+                  onChangeText={(text) => setNewCategoryForm(prev => ({ ...prev, nom: text }))}
+                />
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  placeholder="Description (optionnel)"
+                  value={newCategoryForm.description}
+                  onChangeText={(text) => setNewCategoryForm(prev => ({ ...prev, description: text }))}
+                  multiline
+                  numberOfLines={3}
+                />
+              </ScrollView>
+              <View style={styles.modalActions}>
+                <TouchableOpacity 
+                  style={styles.cancelButton} 
+                  onPress={() => {
+                    setShowNewCategoryModal(false);
+                    setNewCategoryForm({ nom: '', description: '' });
+                  }}
+                  disabled={isCreatingCategory}
+                >
+                  <Text style={styles.cancelButtonText}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.submitButton, (!newCategoryForm.nom.trim() || isCreatingCategory) && styles.disabledButton]} 
+                  onPress={handleCreateCategory}
+                  disabled={!newCategoryForm.nom.trim() || isCreatingCategory}
+                >
+                  {isCreatingCategory ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <Text style={styles.submitButtonText}>Créer</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Modal pour modifier une catégorie */}
+      <Modal
+        visible={showEditCategoryModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => {
+          setShowEditCategoryModal(false);
+          setCategoryToEdit(null);
+          setEditCategoryForm({ nom: '', description: '' });
+        }}
+      >
+        <KeyboardAvoidingView 
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Modifier la catégorie</Text>
+                <TouchableOpacity onPress={() => {
+                  setShowEditCategoryModal(false);
+                  setCategoryToEdit(null);
+                  setEditCategoryForm({ nom: '', description: '' });
+                }}>
+                  <Ionicons name="close" size={24} color="#666" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={styles.modalBody}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Nom de la catégorie"
+                  value={editCategoryForm.nom}
+                  onChangeText={(text) => setEditCategoryForm(prev => ({ ...prev, nom: text }))}
+                />
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  placeholder="Description (optionnel)"
+                  value={editCategoryForm.description}
+                  onChangeText={(text) => setEditCategoryForm(prev => ({ ...prev, description: text }))}
+                  multiline
+                  numberOfLines={3}
+                />
+              </ScrollView>
+              <View style={styles.modalActions}>
+                <TouchableOpacity 
+                  style={styles.cancelButton} 
+                  onPress={() => {
+                    setShowEditCategoryModal(false);
+                    setCategoryToEdit(null);
+                    setEditCategoryForm({ nom: '', description: '' });
+                  }}
+                  disabled={isUpdatingCategory}
+                >
+                  <Text style={styles.cancelButtonText}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.submitButton, (!editCategoryForm.nom.trim() || isUpdatingCategory) && styles.disabledButton]} 
+                  onPress={handleEditCategory}
+                  disabled={!editCategoryForm.nom.trim() || isUpdatingCategory}
+                >
+                  {isUpdatingCategory ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <Text style={styles.submitButtonText}>Modifier</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Toast pour les messages */}
@@ -1566,5 +1739,81 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  // Styles pour les catégories dynamiques
+  tabCount: {
+    fontSize: 10,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  activeTabCount: {
+    color: 'white',
+  },
+  addCategoryButton: {
+    backgroundColor: '#F0F0F0',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  tabHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+    paddingHorizontal: 4,
+  },
+  tabHeaderLeft: {
+    flex: 1,
+  },
+  tabHeaderRight: {
+    alignItems: 'flex-end',
+  },
+  tabDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
+  },
+  filterResults: {
+    fontSize: 12,
+    color: '#007AFF',
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  categoryActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  editCategoryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E3F2FD',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+  },
+  editCategoryButtonText: {
+    fontSize: 12,
+    color: '#007AFF',
+    marginLeft: 4,
+  },
+  deleteCategoryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFEBEE',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+  },
+  deleteCategoryButtonText: {
+    fontSize: 12,
+    color: '#FF3B30',
+    marginLeft: 4,
+  },
+  categoryScrollView: {
+    marginBottom: 16,
   },
 });

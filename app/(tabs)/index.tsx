@@ -503,7 +503,7 @@ export default function DashboardScreen() {
 
                 <TouchableOpacity
                   style={styles.actionCard}
-                  onPress={() => router.push('/membre/change-password')}
+                  onPress={() => router.push('/(tabs)/change-password')}
                 >
                   <Ionicons name="key-outline" size={48} color="#AF52DE" />
                   <Text style={styles.actionTitle}>Sécurité du compte</Text>

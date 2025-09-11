@@ -3,6 +3,7 @@ import { DrawerContentScrollView, DrawerItemList } from '@react-navigation/drawe
 import { router } from 'expo-router';
 import React from 'react';
 import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useLastTab } from '../../contexts/LastTabContext';
 import { useAuth } from '../../hooks/useAuth';
 
 interface CustomDrawerContentProps {
@@ -13,6 +14,7 @@ interface CustomDrawerContentProps {
 
 export default function CustomDrawerContent(props: CustomDrawerContentProps) {
   const { logout, user } = useAuth();
+  const { addToHistory } = useLastTab();
 
   const handleLogout = () => {
     Alert.alert(
@@ -66,6 +68,8 @@ export default function CustomDrawerContent(props: CustomDrawerContentProps) {
            <TouchableOpacity
              style={styles.memberLink}
              onPress={() => {
+               console.log('🎯 Clic sur Ma fiche d\'adhésion');
+               addToHistory('adhesion');
                router.push(`/adhesion/${user.id}`);
              }}
              activeOpacity={0.7}

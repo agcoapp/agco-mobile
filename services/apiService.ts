@@ -240,11 +240,89 @@ export interface ErrorResponse {
   details?: string;
 }
 
+
+// Interfaces pour les catégories de textes officiels
+export interface CreerCategorieTexteOfficielRequest {
+  nom: string;
+  description?: string;
+}
+
+export interface MettreAJourCategorieTexteOfficielRequest {
+  nom?: string;
+  description?: string;
+  est_actif?: boolean;
+}
+
+export interface ToggleCategorieTexteOfficielRequest {
+  est_actif: boolean;
+}
+
+export interface CategorieTexteOfficiel {
+  id: number;
+  nom: string;
+  description?: string;
+  est_actif: boolean;
+  cree_le: string;
+  modifie_le?: string;
+  createur?: {
+    nom_complet: string;
+    nom_utilisateur: string;
+  };
+  nombre_textes?: number;
+}
+
+export interface CategorieTexteOfficielResponse {
+  message: string;
+  categorie: CategorieTexteOfficiel;
+}
+
+export interface ListeCategoriesTexteOfficielResponse {
+  message: string;
+  donnees: {
+    categories: CategorieTexteOfficiel[];
+    pagination: Pagination;
+  };
+}
+
+export interface CategorieTexteOfficielDetailsResponse {
+  message: string;
+  categorie: CategorieTexteOfficiel & {
+    statistiques?: {
+      nombre_total_textes: number;
+      derniers_textes: Array<{
+        id: number;
+        titre: string;
+        description?: string;
+        telecharge_le: string;
+        est_actif: boolean;
+      }>;
+    };
+  };
+}
+
+export interface CategoriesTexteOfficielStatistiquesResponse {
+  message: string;
+  statistiques: {
+    total_categories: number;
+    categories_actives: number;
+    categories_inactives: number;
+    categories_avec_textes: number;
+    categories_sans_textes: number;
+    top_categories: Array<{
+      id: number;
+      nom: string;
+      description?: string;
+      nombre_textes: number;
+    }>;
+  };
+}
+
+
 // Nouvelles interfaces pour les textes officiels
 export interface CreerTexteOfficielRequest {
   titre: string;
   description?: string;
-  type_document: 'PV_REUNION' | 'COMPTE_RENDU' | 'DECISION' | 'REGLEMENT_INTERIEUR';
+  id_categorie: number;
   url_cloudinary: string;
   cloudinary_id: string;
   taille_fichier?: number;
@@ -261,8 +339,11 @@ export interface TexteOfficiel {
   id: number;
   titre: string;
   description?: string;
-  type_document: string;
-  type_document_label: string;
+  categorie: {
+    id: number;
+    nom: string;
+    description?: string;
+  };
   url_cloudinary: string;
   taille_fichier?: number;
   nom_fichier_original: string;
@@ -273,7 +354,6 @@ export interface TexteOfficiel {
     nom: string;
     role: string;
   };
-  est_actif: boolean;
 }
 
 export interface TexteOfficielResponse {
@@ -784,6 +864,53 @@ class ApiService {
     return response.data;
   }
 
+  // NOUVELLES MÉTHODES POUR LES CATÉGORIES DE TEXTES OFFICIELS
+  async createCategorieTexteOfficiel(request: CreerCategorieTexteOfficielRequest): Promise<CategorieTexteOfficielResponse> {
+    const response = await this.axiosInstance.post(`/api/categories-texte-officiel`, request);
+    return response.data;
+  }
+
+  async getCategoriesTexteOfficiel(params?: {
+    page?: number;
+    limite?: number;
+    recherche?: string;
+    actif_seulement?: boolean;
+  }): Promise<ListeCategoriesTexteOfficielResponse> {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.limite) searchParams.append('limite', params.limite.toString());
+    if (params?.recherche) searchParams.append('recherche', params.recherche);
+    if (params?.actif_seulement !== undefined) searchParams.append('actif_seulement', params.actif_seulement.toString());
+
+    const response = await this.axiosInstance.get(`/api/categories-texte-officiel?${searchParams}`);
+    return response.data;
+  }
+
+  async getCategoriesTexteOfficielStatistiques(): Promise<CategoriesTexteOfficielStatistiquesResponse> {
+    const response = await this.axiosInstance.get(`/api/categories-texte-officiel/statistiques`);
+    return response.data;
+  }
+
+  async getCategorieTexteOfficiel(id: number): Promise<CategorieTexteOfficielDetailsResponse> {
+    const response = await this.axiosInstance.get(`/api/categories-texte-officiel/${id}`);
+    return response.data;
+  }
+
+  async updateCategorieTexteOfficiel(id: number, request: MettreAJourCategorieTexteOfficielRequest): Promise<CategorieTexteOfficielResponse> {
+    const response = await this.axiosInstance.put(`/api/categories-texte-officiel/${id}`, request);
+    return response.data;
+  }
+
+  async deleteCategorieTexteOfficiel(id: number): Promise<{ message: string; categorie_supprimee: { id: number; nom: string } }> {
+    const response = await this.axiosInstance.delete(`/api/categories-texte-officiel/${id}`);
+    return response.data;
+  }
+
+  async toggleCategorieTexteOfficiel(id: number, request: ToggleCategorieTexteOfficielRequest): Promise<{ message: string; categorie: { id: number; nom: string; est_actif: boolean; modifie_le: string } }> {
+    const response = await this.axiosInstance.patch(`/api/categories-texte-officiel/${id}/toggle`, request);
+    return response.data;
+  }
+
   // NOUVELLES MÉTHODES POUR LES TEXTES OFFICIELS
   async createTexteOfficiel(request: CreerTexteOfficielRequest): Promise<TexteOfficielResponse> {
     const response = await this.axiosInstance.post(`/api/textes-officiels`, request);
@@ -791,13 +918,13 @@ class ApiService {
   }
 
   async getTextesOfficiels(params?: {
-    type_document?: string;
+    id_categorie?: number;
     page?: number;
     limite?: number;
     recherche?: string;
   }): Promise<ListeTextesOfficielsResponse> {
     const searchParams = new URLSearchParams();
-    if (params?.type_document) searchParams.append('type_document', params.type_document);
+    if (params?.id_categorie) searchParams.append('id_categorie', params.id_categorie.toString());
     if (params?.page) searchParams.append('page', params.page.toString());
     if (params?.limite) searchParams.append('limite', params.limite.toString());
     if (params?.recherche) searchParams.append('recherche', params.recherche);

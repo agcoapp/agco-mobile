@@ -1,6 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImageManipulator from 'expo-image-manipulator';
-import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -24,6 +23,8 @@ import AdhesionFormGenerator, { AdhesionFormGeneratorRef } from '../../component
 import CarteRectoGenerator, { CarteRectoGeneratorRef } from '../../components/CarteRectoGenerator';
 import CarteVersoGenerator, { CarteVersoGeneratorRef } from '../../components/CarteVersoGenerator';
 import { useAuth } from '../../hooks/useAuth';
+import { useNavigationHistory } from '../../hooks/useNavigationHistory';
+import { useRouterWithHistory } from '../../hooks/useRouterWithHistory';
 import { apiService } from '../../services/apiService';
 
 interface AdhesionForm {
@@ -42,6 +43,8 @@ interface AdhesionForm {
 
 export default function AdhesionsScreen() {
   const { user } = useAuth();
+  const { handleBackNavigation } = useNavigationHistory();
+  const router = useRouterWithHistory();
   const [tabValue, setTabValue] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [adhesions, setAdhesions] = useState<AdhesionForm[]>([]);
@@ -824,7 +827,7 @@ export default function AdhesionsScreen() {
           <Text style={styles.errorText}>
             Vous n'avez pas les permissions nécessaires pour accéder à cette page.
           </Text>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <TouchableOpacity style={styles.backButton} onPress={handleBackNavigation}>
             <Text style={styles.backButtonText}>Retour</Text>
           </TouchableOpacity>
         </View>
@@ -874,7 +877,7 @@ export default function AdhesionsScreen() {
         <View style={styles.adhesionActions}>
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => router.push(`/adhesion/${item.id}` as any)}
+            onPress={() => router.push(`/adhesion/${item.id}`)}
             disabled={actionLoading === item.id}
           >
             <Ionicons name="eye-outline" size={20} color="#007AFF" />
@@ -929,7 +932,7 @@ export default function AdhesionsScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         {/* Bouton de retour */}
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <TouchableOpacity style={styles.backButton} onPress={handleBackNavigation}>
           <Ionicons name="arrow-back" size={24} color="#007AFF" />
           <Text style={styles.backButtonText}>Retour</Text>
         </TouchableOpacity>
