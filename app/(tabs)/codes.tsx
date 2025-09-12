@@ -109,11 +109,6 @@ export default function CodesScreen() {
       if (newCode) {
         setHighlightedCodeId(newCode.id.toString());
         
-        // Afficher un message informatif sur la surbrillance
-        setToastMessage(`Nouveau code créé ! La ligne est mise en surbrillance en vert.`);
-        setToastType('success');
-        setShowToast(true);
-        
         // Retirer la surbrillance après 5 secondes
         setTimeout(() => {
           setHighlightedCodeId(null);
@@ -150,15 +145,8 @@ export default function CodesScreen() {
         mot_passe_temporaire: response.membre.mot_passe_temporaire
       });
       
-      // Copier automatiquement les identifiants dans le presse-papiers
-      const credentialsText = `Nom d'utilisateur: ${response.membre.nom_utilisateur}\nCode d'accès: ${response.membre.mot_passe_temporaire}`;
-      
-      try {
-        await Clipboard.setString(credentialsText);
-        setToastMessage(`Identifiants créés et copiés dans le presse-papiers !`);
-      } catch (clipboardError) {
-        setToastMessage(`Identifiants créés avec succès ! (Erreur lors de la copie automatique)`);
-      }
+
+      setToastMessage(`Identifiants créés avec succès !`);
       setToastType('success');
       setShowToast(true);
       
@@ -312,7 +300,7 @@ export default function CodesScreen() {
                onPress={() => copyToClipboard(item)}
              >
                <Ionicons name="copy-outline" size={20} color="#007AFF" />
-               <Text style={styles.copyButtonText}>Copier tout</Text>
+               <Text style={styles.copyButtonText}>Copier</Text>
              </TouchableOpacity>
           </View>
         </View>
@@ -476,7 +464,7 @@ export default function CodesScreen() {
         onRequestClose={cancelDeleteCode}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={styles.modalContentSmall}>
             <Text style={styles.modalTitle}>Confirmer la suppression</Text>
             
             <Text style={styles.deleteMessage}>
@@ -737,6 +725,15 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 500,
     minHeight: 400,
+  },
+  modalContentSmall: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 24,
+    width: '90%',
+    maxWidth: 400,
+    minHeight: 200,
+    maxHeight: '80%',
   },
   modalScrollContent: {
     flexGrow: 1,

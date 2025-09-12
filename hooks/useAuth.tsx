@@ -286,13 +286,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await apiService.logout();
       setUser(null);
       setUserStatus(null);
-      await AsyncStorage.multiRemove(['sgm_user', 'sgm_token']);
+      
+      // Vider complètement l'AsyncStorage
+      await AsyncStorage.clear();
+      console.log('✅ AsyncStorage complètement vidé');
+      
       router.replace('/login');
     } catch (error) {
       console.error('Erreur lors de la déconnexion:', error);
       setUser(null);
       setUserStatus(null);
-      await AsyncStorage.multiRemove(['sgm_user', 'sgm_token']);
+      
+      // En cas d'erreur, vider quand même l'AsyncStorage
+      try {
+        await AsyncStorage.clear();
+        console.log('✅ AsyncStorage vidé après erreur');
+      } catch (clearError) {
+        console.error('❌ Erreur lors du vidage d\'AsyncStorage:', clearError);
+      }
+      
       router.replace('/login');
     }
   };

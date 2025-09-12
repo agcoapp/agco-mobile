@@ -58,6 +58,11 @@ export default function CustomDrawerContent(props: CustomDrawerContentProps) {
                 const hiddenRoutes = ['codes', 'cartes', 'settings', 'adhesions'];
                 return !hiddenRoutes.includes(route.name);
               }
+              // Si l'utilisateur est un président, masquer le lien "Codes"
+              if (user?.role === 'PRESIDENT') {
+                const hiddenRoutes = ['codes'];
+                return !hiddenRoutes.includes(route.name);
+              }
               // Pour les autres rôles, afficher tous les liens
               return true;
             })

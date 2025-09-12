@@ -490,6 +490,12 @@ export default function AdhesionsScreen() {
       });
       
       console.log('✅ Formulaire d\'administrateur rejeté:', result);
+
+      // Mettre à jour la liste locale immédiatement
+      const updatedAdminFormulaires = adminFormulaires.map((a: any) => 
+        a.id === id ? { ...a, statut: 'REJETE' as const } : a
+      );
+      setAdminFormulaires(updatedAdminFormulaires);
       
       Alert.alert('Succès', 'Le formulaire d\'administrateur a été rejeté', [
         {
@@ -498,7 +504,7 @@ export default function AdhesionsScreen() {
             setShowRejectionModal(false);
             setRejectionReason('');
             setSelectedReason('');
-            loadAdminFormulaires(); // Recharger la liste
+            loadAdminFormulaires(); // Recharger la liste depuis l'API
           }
         }
       ]);
