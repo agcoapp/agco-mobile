@@ -882,18 +882,23 @@ export default function RegisterScreen() {
         const adminData = {
           prenoms: formData.firstName,
           nom: formData.lastName,
+          telephone: formData.phone,
+          adresse: formData.address,
           date_naissance: formatDateToDDMMYYYY(formData.birthDate),
           lieu_naissance: formData.birthPlace,
-          adresse: formData.address,
           profession: formData.profession,
           ville_residence: formData.city,
           date_entree_congo: formatDateToDDMMYYYY(formData.entryDate),
           employeur_ecole: formData.employer,
-          telephone: formData.phone,
-          url_image_formulaire: cloudinaryFormUrl,
           numero_carte_consulaire: formData.idNumber || '',
-          email: user?.email || '',
-          signature_url: cloudinarySignatureUrl || ''
+          date_emission_piece: formData.idIssueDate ? formatDateToDDMMYYYY(formData.idIssueDate) : '',
+          prenom_conjoint: formData.spouseName ? formData.spouseName.split(' ')[0] : '',
+          nom_conjoint: formData.spouseName ? formData.spouseName.split(' ').slice(1).join(' ') : '',
+          nombre_enfants: parseInt(formData.childrenCount) || 0,
+          selfie_photo_url: cloudinaryPhotoUrl || '',
+          signature_url: cloudinarySignatureUrl || '',
+          commentaire: formData.comment || '',
+          url_image_formulaire: cloudinaryFormUrl
         };
         console.log('Données JSON pour les administrateurs:', adminData);
         response = await apiService.submitAdminFormulairePersonnel(adminData);
@@ -901,8 +906,6 @@ export default function RegisterScreen() {
         // Pour les membres normaux, utiliser l'API d'adhésion standard
         response = await apiService.submitAdhesion(jsonDataToSend);
       }
-
-      console.log('Réponse de l\'API:', response);
 
       // Définir le message selon le mode et le rôle
       let message;
@@ -1224,22 +1227,30 @@ export default function RegisterScreen() {
         {/* Modal pour afficher l'image en grand */}
         {showImageModal && selectedImage && (
           <View style={styles.imageModal}>
-            <View style={styles.imageModalContent}>
-              <TouchableOpacity 
-                style={styles.closeModalButton}
-                onPress={() => {
-                  setShowImageModal(false);
-                  setSelectedImage(null);
-                }}
-              >
-                <Ionicons name="close" size={24} color="white" />
-              </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.closeModalButton}
+              onPress={() => {
+                setShowImageModal(false);
+                setSelectedImage(null);
+              }}
+            >
+              <Ionicons name="close" size={24} color="white" />
+            </TouchableOpacity>
+            <ScrollView 
+              style={styles.imageScrollView}
+              contentContainerStyle={styles.imageScrollContent}
+              showsVerticalScrollIndicator={false}
+              showsHorizontalScrollIndicator={false}
+              maximumZoomScale={3}
+              minimumZoomScale={1}
+              bounces={true}
+            >
               <Image 
                 source={{ uri: selectedImage }} 
                 style={styles.fullScreenImage}
                 resizeMode="contain"
               />
-            </View>
+            </ScrollView>
           </View>
         )}
 
@@ -1556,7 +1567,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   photoImage: {
-    width: 170,
+    width: 200,
     height: 200,
     borderRadius: 8,
   },
@@ -1593,7 +1604,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   signatureImage: {
-    width: 170,
+    width: 200,
     height: 200,
     borderRadius: 8,
   },
@@ -1664,6 +1675,16 @@ const styles = StyleSheet.create({
      alignItems: 'center',
      position: 'relative',
    },
+   imageScrollView: {
+     flex: 1,
+     width: '100%',
+   },
+   imageScrollContent: {
+     flexGrow: 1,
+     justifyContent: 'center',
+     alignItems: 'center',
+     minHeight: '100%',
+   },
    closeModalButton: {
      position: 'absolute',
      top: 50,
@@ -1678,7 +1699,9 @@ const styles = StyleSheet.create({
    },
        fullScreenImage: {
       width: width,
-      height: height * 0.8,
+      height: height * 0.9,
+      maxWidth: width,
+      maxHeight: height * 0.9,
     },
     fullWidthField: {
       width: '100%',

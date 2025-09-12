@@ -217,7 +217,7 @@ export default function TabLayout() {
               onPress={handleProfileClick}
               activeOpacity={0.7}
             >
-                {userStatus?.images?.selfie_photo ? (
+                {userStatus?.images?.selfie_photo && userStatus.numero_adhesion ? (
                   <Image
                     source={{ uri: userStatus.images.selfie_photo }}
                     style={styles.profileImage}
@@ -255,7 +255,7 @@ export default function TabLayout() {
             
             {/* Photo de profil ou initiales dans le modal */}
             <View style={styles.modalProfileContainer}>
-              {userStatus?.images?.selfie_photo ? (
+              {userStatus?.images?.selfie_photo && userStatus.numero_adhesion ? (
                 <TouchableOpacity activeOpacity={0.8}>
                   <Image
                     source={{ uri: userStatus.images.selfie_photo }}

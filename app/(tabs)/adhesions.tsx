@@ -79,6 +79,7 @@ export default function AdhesionsScreen() {
   const [adminTabValue, setAdminTabValue] = useState(0);
   const [showAdminFormulaires, setShowAdminFormulaires] = useState(false);
   const [loadingAdminFormulaires, setLoadingAdminFormulaires] = useState(false);
+  const [isAdminFormulaireContext, setIsAdminFormulaireContext] = useState(false);
 
   // Références aux générateurs
   const adhesionFormGeneratorRef = useRef<AdhesionFormGeneratorRef>(null);
@@ -275,7 +276,7 @@ export default function AdhesionsScreen() {
     try {
       setLoadingAdminFormulaires(true);
       const response = await apiService.getSecretaryAdminFormulaires();
-      console.log('📊 Formulaires d\'administrateurs reçus:', response);
+      console.log('📊 Formulaires d\'administrateurs reçus:', response.donnees.formulaires);
 
       if (response?.donnees?.formulaires) {
         setAdminFormulaires(response.donnees.formulaires);
@@ -296,6 +297,215 @@ export default function AdhesionsScreen() {
       setAdminFormulaires([]);
     } finally {
       setLoadingAdminFormulaires(false);
+    }
+  };
+
+  // Valider un formulaire d'administrateur
+  const handleValidateAdminFormulaire = async (id: number) => {
+    try {
+      setIsValidating(true);
+      setValidationStep(0);
+      console.log('✅ Récupération de la Signature du président');
+      
+      // Récupérer la signature du président
+      const presidentSignatureData = await apiService.getPresidentSignature();
+      const presidentSignatureUrl = presidentSignatureData.signature_url;
+      
+      console.log('✅ Signature du président récupérée:', presidentSignatureUrl);
+
+      // Récupérer les données complètes de l'adhésion
+      const adhesionDetails = await apiService.getSecretaryAdminFormulaires();
+      
+      // Trouver l'adhésion spécifique dans la liste
+      const specificAdhesion = adhesionDetails.donnees?.formulaires?.find(
+        (form: any) => form.id === id
+      );
+
+      // Créer le public_id fixe basé sur l'ID de l'adhésion
+      const publicId = `adhesions/${id}`;
+      console.log('🏷️ Public ID fixe:', publicId);
+
+      // Convertir les images en base64
+      let logoBase64 = '';
+      
+      try {
+        const { Image } = require('react-native');
+        const logoUri = Image.resolveAssetSource(require('../../assets/images/logo.png')).uri
+        logoBase64 = await convertImageToBase64WithTransparency(logoUri, 250, 220, 0.9, true);
+      } catch (error) {
+        console.log('⚠️ Logo non trouvé:', error);
+      }
+
+      // Générer le PNG de la fiche d'adhésion avec la signature du président (sans numéro d'adhésion)
+      setValidationStep(1);
+      console.log('🖼️ Génération du PNG de la fiche d\'adhésion...', specificAdhesion?.donnees_snapshot);
+      const pngBase64 = await adhesionFormGeneratorRef.current?.generatePNG(
+        logoBase64,
+        specificAdhesion?.donnees_snapshot.selfie_photo_url, 
+        specificAdhesion?.donnees_snapshot.signature_url,
+        specificAdhesion?.donnees_snapshot,
+        presidentSignatureUrl
+      );
+      
+      if (!pngBase64) {
+        throw new Error('Impossible de générer le PNG de la fiche d\'adhésion');
+      }
+      
+      // Uploader le PNG sur Cloudinary avec le public_id fixe (utilise la signature Cloudinary signée)
+      console.log('☁️ Upload du PNG sur Cloudinary avec signature signée et public_id fixe...');
+      const cloudinaryResult = await uploadPNGToCloudinary(pngBase64, publicId);
+      
+      console.log('✅ PNG uploadé sur Cloudinary:', cloudinaryResult);
+
+      // Maintenant que nous avons le numéro d'adhésion, générer les cartes RECTO et VERSO
+      console.log('🔄 Génération des cartes RECTO et VERSO avec le numéro d\'adhésion...');
+      
+      // Générer la carte RECTO
+      setValidationStep(2);
+      console.log('🖼️ Génération de la carte RECTO...');
+      const rectoBase64 = await generateCardRecto(specificAdhesion as any);
+      
+      // Uploader la carte RECTO sur Cloudinary avec public_id fixe
+      const rectoPublicId = `cartes_membres/${id}_recto`;
+      console.log('☁️ Upload de la carte RECTO sur Cloudinary...');
+      const rectoResult = await uploadPNGToCloudinary(rectoBase64, rectoPublicId);
+      console.log('✅ Carte RECTO uploadée:', rectoResult.url);
+      
+      // Générer la carte VERSO
+      setValidationStep(3);
+      console.log('🖼️ Génération de la carte VERSO...');
+      const versoBase64 = await generateCardVerso(specificAdhesion, presidentSignatureUrl, cloudinaryResult.url);
+      
+      // Uploader la carte VERSO sur Cloudinary avec public_id fixe
+      const versoPublicId = `cartes_membres/${id}_verso`;
+      console.log('☁️ Upload de la carte VERSO sur Cloudinary...');
+      const versoResult = await uploadPNGToCloudinary(versoBase64, versoPublicId);
+      console.log('✅ Carte VERSO uploadée:', versoResult.url);
+      
+      // Appeler l'API pour approuver le formulaire avec les URLs des cartes
+      setValidationStep(4);
+      console.log('📋 Appel de l\'API pour approuver le formulaire...');
+      const result = await apiService.approveAdminFormulaire({
+        id_formulaire: id,
+        commentaire: 'Formulaire approuvé avec succès',
+        url_formulaire_final: cloudinaryResult.url,
+        carte_recto_url: rectoResult.url,
+        carte_verso_url: versoResult.url
+      });
+      
+      console.log('✅ Formulaire approuvé avec succès:', result);
+      
+      // Récupérer le numéro d'adhésion de la réponse
+      const numeroAdhesion = result?.formulaire?.numero_adhesion;
+
+      if (!numeroAdhesion) {
+        throw new Error('Numéro d\'adhésion non trouvé dans la réponse de l\'API');
+      }
+      
+      // Maintenant que nous avons le numéro d'adhésion, régénérer le PNG et le réuploader
+      console.log('🔄 Régénération du PNG avec le numéro d\'adhésion...');
+      const finalUrl = await regenerateAndReuploadPNG(
+        specificAdhesion?.donnees_snapshot, 
+        presidentSignatureUrl, 
+        publicId,
+        numeroAdhesion
+      );
+
+      console.log('✅ PNG final avec numéro d\'adhésion:', finalUrl);
+      
+      // Maintenant que nous avons le numéro d'adhésion, régénérer les cartes RECTO et VERSO
+      console.log('🔄 Régénération des cartes RECTO et VERSO avec le numéro d\'adhésion...');
+      
+      // Régénérer la carte RECTO avec le numéro d'adhésion
+      console.log('🖼️ Régénération de la carte RECTO avec numéro d\'adhésion...');
+      
+      // Ajouter le numéro d'adhésion à specificAdhesion pour l'affichage sur la carte
+      const specificAdhesionWithNumber = {
+        ...specificAdhesion,
+        numero_adhesion: numeroAdhesion // Utiliser le numéro de l'API ou défaut
+      };
+      
+      const rectoBase64WithNumber = await generateCardRecto(specificAdhesionWithNumber as any);
+      
+      // Réuploader la carte RECTO sur le même public_id avec overwrite
+      console.log('☁️ Réupload de la carte RECTO sur Cloudinary avec overwrite...');
+      const rectoResultWithNumber = await uploadPNGToCloudinary(rectoBase64WithNumber, rectoPublicId);
+      console.log('✅ Carte RECTO régénérée et réuploadée:', rectoResultWithNumber.url);
+      
+      // Régénérer la carte VERSO avec le numéro d'adhésion
+      console.log('🖼️ Régénération de la carte VERSO avec numéro d\'adhésion...');
+      const versoBase64WithNumber = await generateCardVerso(specificAdhesionWithNumber, presidentSignatureUrl, cloudinaryResult.url);
+      
+      // Réuploader la carte VERSO sur le même public_id avec overwrite
+      console.log('☁️ Réupload de la carte VERSO sur Cloudinary avec overwrite...');
+      const versoResultWithNumber = await uploadPNGToCloudinary(versoBase64WithNumber, versoPublicId);
+      console.log('✅ Carte VERSO régénérée et réuploadée:', versoResultWithNumber.url);
+
+      console.log('✅ PNG final avec numéro d\'adhésion:', finalUrl);
+      console.log('✅ Cartes RECTO et VERSO régénérées et réuploadées avec succès !');
+
+      // Mettre à jour la liste locale
+      const updatedAdminFormulaires = adminFormulaires.map((a: any) => 
+        a.id === id ? { ...a, statut: 'APPROUVE' as const } : a
+      );
+      
+      setAdminFormulaires(updatedAdminFormulaires);
+      
+      // Réinitialiser les états de validation
+      setIsValidating(false);
+      setValidationStep(0);
+      
+      Alert.alert(
+        'Succès',
+        'Adhésion validée avec succès !',
+        [{ text: 'OK' }]
+      );
+      
+      // Fermer le modal de confirmation seulement après succès
+      setShowValidationModal(false);
+      setSelectedAdhesion(null);
+
+    } catch (error: any) {
+      console.error('❌ Erreur lors de la validation:', error);
+      
+      // Réinitialiser les états de validation en cas d'erreur
+      setIsValidating(false);
+      setValidationStep(0);
+      
+      Alert.alert(
+        'Erreur',
+        error.message || 'Erreur lors de la validation du formulaire d\'administrateur',
+        [{ text: 'OK' }]
+      );
+      // En cas d'erreur, ne pas fermer le modal pour permettre à l'utilisateur de corriger
+    }
+  };
+
+  // Rejeter un formulaire d'administrateur
+  const handleRejectAdminFormulaire = async (id: number, reason: string) => {
+    try {
+      const result = await apiService.rejectAdminFormulaire({
+        id_formulaire: id,
+        raison: reason
+      });
+      
+      console.log('✅ Formulaire d\'administrateur rejeté:', result);
+      
+      Alert.alert('Succès', 'Le formulaire d\'administrateur a été rejeté', [
+        {
+          text: 'OK',
+          onPress: () => {
+            setShowRejectionModal(false);
+            setRejectionReason('');
+            setSelectedReason('');
+            loadAdminFormulaires(); // Recharger la liste
+          }
+        }
+      ]);
+      
+    } catch (error) {
+      console.error('❌ Erreur lors du rejet du formulaire d\'administrateur:', error);
+      Alert.alert('Erreur', 'Erreur lors du rejet du formulaire d\'administrateur');
     }
   };
 
@@ -383,6 +593,19 @@ export default function AdhesionsScreen() {
   };
 
   // Fonction pour générer la carte RECTO en utilisant le générateur
+  // Fonction utilitaire pour normaliser les données (adhésion normale ou formulaire d'administrateur)
+  const normalizeMemberData = (member: any) => {
+    // Détecter le type de données (adhésion normale ou formulaire d'administrateur)
+    const donneesSnapshot = member.formulaire_actuel?.donnees_snapshot || member.donnees_snapshot;
+    const urlImageFormulaire = member.formulaire_actuel?.url_image_formulaire || member.url_fiche_formulaire;
+    
+    return {
+      donneesSnapshot,
+      urlImageFormulaire,
+      isAdminFormulaire: !!member.donnees_snapshot // Si donnees_snapshot existe directement, c'est un formulaire d'administrateur
+    };
+  };
+
   const generateCardRecto = async (member: any): Promise<string> => {
     try {
       // Convertir les images en base64
@@ -397,9 +620,12 @@ export default function AdhesionsScreen() {
         console.log('⚠️ Logo non trouvé:', error);
       }
       
-      if (member.formulaire_actuel?.donnees_snapshot?.selfie_photo_url) {
+      // Normaliser les données
+      const { donneesSnapshot } = normalizeMemberData(member);
+
+      if (donneesSnapshot?.selfie_photo_url) {
         try {
-          photoBase64 = await convertImageToBase64(member.formulaire_actuel.donnees_snapshot.selfie_photo_url, 160, 200, 0.8);
+          photoBase64 = await convertImageToBase64(donneesSnapshot.selfie_photo_url, 160, 200, 0.8);
         } catch (error) {
           console.log('Photo non trouvée');
         }
@@ -454,7 +680,9 @@ export default function AdhesionsScreen() {
       // Utiliser le générateur de carte verso
       if (carteVersoGeneratorRef.current) {
         console.log('🔄 Génération de la carte VERSO avec le générateur...');
-        console.log('QR Code sera généré automatiquement à partir de:', finalFormUrl || member.formulaire_actuel?.url_image_formulaire);
+        // Normaliser les données
+        const { urlImageFormulaire } = normalizeMemberData(member);
+        console.log('QR Code sera généré automatiquement à partir de:', finalFormUrl || urlImageFormulaire);
         console.log('Signature disponible:', signatureBase64 ? 'Oui' : 'Non');
         
         // Ne pas passer de QR code - il sera généré automatiquement par le générateur
@@ -959,6 +1187,7 @@ export default function AdhesionsScreen() {
                 style={[styles.actionButton, styles.validateButton]}
                 onPress={() => {
                   setSelectedAdhesion(item);
+                  setIsAdminFormulaireContext(false);
                   setShowValidationModal(true);
                 }}
                 disabled={actionLoading === item.id}
@@ -977,6 +1206,7 @@ export default function AdhesionsScreen() {
                 style={[styles.actionButton, styles.rejectButton]}
                 onPress={() => {
                   setSelectedAdhesion(item);
+                  setIsAdminFormulaireContext(false);
                   setShowRejectionModal(true);
                 }}
                 disabled={actionLoading === item.id}
@@ -1038,24 +1268,10 @@ export default function AdhesionsScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Message si pas de données */}
-        {!loading && (!Array.isArray(adhesions) || adhesions.length === 0) && (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="document-outline" size={64} color="#8E8E93" />
-            <Text style={styles.emptyTitle}>Aucune adhésion trouvée</Text>
-            <Text style={styles.emptyText}>
-              {Array.isArray(adhesions) 
-                ? 'Il n\'y a actuellement aucune adhésion dans le système.'
-                : 'Erreur lors du chargement des données. Veuillez rafraîchir la page.'
-              }
-            </Text>
-          </View>
-        )}
 
         {/* Onglets - Affichage conditionnel selon le mode */}
         {showAdminFormulaires ? (
           <>
-            <Text style={styles.adminFormulairesTitle}>Formulaires d'Administrateurs</Text>
             <View style={styles.tabsContainer}>
               <TouchableOpacity
                 style={[styles.tab, adminTabValue === 0 && styles.activeTab]}
@@ -1133,12 +1349,15 @@ export default function AdhesionsScreen() {
                   ) : (
                     <FlatList
                       data={getFilteredAdminFormulaires('EN_ATTENTE')}
+                      refreshControl={
+                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                      }
                       renderItem={({ item }) => (
                         <View style={styles.adhesionCard}>
                           <View style={styles.adhesionHeader}>
                             <Text style={styles.adhesionName}>{item.utilisateur?.nom_complet}</Text>
-                            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.statut) }]}>
-                              <Text style={styles.statusText}>{getStatusLabel(item.statut)}</Text>
+                            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.statut || 'EN_ATTENTE') }]}>
+                              <Text style={styles.statusText}>{getStatusLabel(item.statut || 'EN_ATTENTE')}</Text>
                             </View>
                           </View>
                           
@@ -1158,13 +1377,40 @@ export default function AdhesionsScreen() {
                             <TouchableOpacity
                               style={styles.actionButton}
                               onPress={() => {
-                                // TODO: Implémenter la vue détaillée du formulaire d'administrateur
-                                Alert.alert('Info', 'Fonctionnalité en cours de développement');
+                                router.push(`/adhesion/${item.id}`);
                               }}
                             >
                               <Ionicons name="eye-outline" size={20} color="#007AFF" />
                               <Text style={styles.actionButtonText}>Voir</Text>
                             </TouchableOpacity>
+                            
+                            {item.statut === 'EN_ATTENTE' && (
+                              <>
+                                <TouchableOpacity
+                                  style={[styles.actionButton, styles.validateButton]}
+                                  onPress={() => {
+                                    setSelectedAdhesion(item);
+                                    setIsAdminFormulaireContext(true);
+                                    setShowValidationModal(true);
+                                  }}
+                                >
+                                  <Ionicons name="checkmark-circle-outline" size={20} color="white" />
+                                  <Text style={[styles.actionButtonText, styles.validateButtonText]}>Valider</Text>
+                                </TouchableOpacity>
+                                
+                                <TouchableOpacity
+                                  style={[styles.actionButton, styles.rejectButton]}
+                                  onPress={() => {
+                                    setSelectedAdhesion(item);
+                                    setIsAdminFormulaireContext(true);
+                                    setShowRejectionModal(true);
+                                  }}
+                                >
+                                  <Ionicons name="close-circle-outline" size={20} color="white" />
+                                  <Text style={[styles.actionButtonText, styles.rejectButtonText]}>Rejeter</Text>
+                                </TouchableOpacity>
+                              </>
+                            )}
                           </View>
                         </View>
                       )}
@@ -1189,12 +1435,15 @@ export default function AdhesionsScreen() {
                   ) : (
                     <FlatList
                       data={getFilteredAdminFormulaires('APPROUVE')}
+                      refreshControl={
+                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                      }
                       renderItem={({ item }) => (
                         <View style={styles.adhesionCard}>
                           <View style={styles.adhesionHeader}>
                             <Text style={styles.adhesionName}>{item.utilisateur?.nom_complet}</Text>
-                            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.statut) }]}>
-                              <Text style={styles.statusText}>{getStatusLabel(item.statut)}</Text>
+                            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.statut || 'APPROUVE') }]}>
+                              <Text style={styles.statusText}>{getStatusLabel(item.statut || 'APPROUVE')}</Text>
                             </View>
                           </View>
                           
@@ -1214,8 +1463,7 @@ export default function AdhesionsScreen() {
                             <TouchableOpacity
                               style={styles.actionButton}
                               onPress={() => {
-                                // TODO: Implémenter la vue détaillée du formulaire d'administrateur
-                                Alert.alert('Info', 'Fonctionnalité en cours de développement');
+                                router.push(`/adhesion/${item.id}`);
                               }}
                             >
                               <Ionicons name="eye-outline" size={20} color="#007AFF" />
@@ -1245,12 +1493,15 @@ export default function AdhesionsScreen() {
                   ) : (
                     <FlatList
                       data={getFilteredAdminFormulaires('REJETE')}
+                      refreshControl={
+                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                      }
                       renderItem={({ item }) => (
                         <View style={styles.adhesionCard}>
                           <View style={styles.adhesionHeader}>
                             <Text style={styles.adhesionName}>{item.utilisateur?.nom_complet}</Text>
-                            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.statut) }]}>
-                              <Text style={styles.statusText}>{getStatusLabel(item.statut)}</Text>
+                            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.statut || 'REJETE') }]}>
+                              <Text style={styles.statusText}>{getStatusLabel(item.statut || 'REJETE')}</Text>
                             </View>
                           </View>
                           
@@ -1277,8 +1528,7 @@ export default function AdhesionsScreen() {
                             <TouchableOpacity
                               style={styles.actionButton}
                               onPress={() => {
-                                // TODO: Implémenter la vue détaillée du formulaire d'administrateur
-                                Alert.alert('Info', 'Fonctionnalité en cours de développement');
+                                router.push(`/adhesion/${item.id}`);
                               }}
                             >
                               <Ionicons name="eye-outline" size={20} color="#007AFF" />
@@ -1386,7 +1636,7 @@ export default function AdhesionsScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>
-              {isValidating ? 'Validation en cours...' : 'Confirmer l\'approbation'}
+              {isValidating ? 'Validation en cours...' : isAdminFormulaireContext ? 'Confirmer l\'approbation du formulaire d\'administrateur' : 'Confirmer l\'approbation'}
             </Text>
             
             {isValidating ? (
@@ -1400,7 +1650,7 @@ export default function AdhesionsScreen() {
             ) : (
               <>
                 <Text style={styles.modalText}>
-                  Êtes-vous sûr de vouloir approuver le formulaire de {selectedAdhesion?.nom_complet} ?
+                  Êtes-vous sûr de vouloir approuver le formulaire de {isAdminFormulaireContext ? (selectedAdhesion as any)?.utilisateur?.nom_complet || 'cet administrateur' : selectedAdhesion?.nom_complet} ?
                 </Text>
                 <View style={styles.modalActions}>
                   <TouchableOpacity
@@ -1413,7 +1663,11 @@ export default function AdhesionsScreen() {
                     style={[styles.modalButton, styles.confirmButton]}
                     onPress={() => {
                       if (selectedAdhesion) {
-                        handleValidateAdhesion(selectedAdhesion.id);
+                        if (isAdminFormulaireContext) {
+                          handleValidateAdminFormulaire(selectedAdhesion.id);
+                        } else {
+                          handleValidateAdhesion(selectedAdhesion.id);
+                        }
                       }
                     }}
                   >
@@ -1440,9 +1694,11 @@ export default function AdhesionsScreen() {
          >
            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
              <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Confirmer le rejet</Text>
+            <Text style={styles.modalTitle}>
+              {isAdminFormulaireContext ? 'Confirmer le rejet du formulaire d\'administrateur' : 'Confirmer le rejet'}
+            </Text>
             <Text style={styles.modalText}>
-              Êtes-vous sûr de vouloir rejeter le formulaire de {selectedAdhesion?.nom_complet} ?
+              Êtes-vous sûr de vouloir rejeter le formulaire de {isAdminFormulaireContext ? (selectedAdhesion as any)?.utilisateur?.nom_complet || 'cet administrateur' : selectedAdhesion?.nom_complet} ?
             </Text>
             
             <Text style={styles.modalLabel}>Raison du rejet *</Text>
@@ -1512,40 +1768,44 @@ export default function AdhesionsScreen() {
               </>
             )}
             
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setShowRejectionModal(false);
-                  setRejectionReason('');
-                  setSelectedReason('');
-                }}
-              >
-                <Text style={styles.cancelButtonText}>Annuler</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.modalButton, 
-                  styles.rejectButton,
-                  (!selectedReason || (selectedReason === 'autre' && !rejectionReason.trim())) && styles.disabledButton
-                ]}
-                onPress={() => {
-                  if (selectedAdhesion) {
-                    const finalReason = selectedReason === 'autre' ? rejectionReason : selectedReason;
-                    if (finalReason.trim()) {
-                      handleRejectAdhesion(selectedAdhesion.id, finalReason.trim());
-                    }
-                  }
-                  setShowRejectionModal(false);
-                  setRejectionReason('');
-                  setSelectedReason('');
-                }}
-                disabled={!selectedReason || (selectedReason === 'autre' && !rejectionReason.trim())}
-              >
-                <Text style={styles.rejectButtonText}>Rejeter</Text>
-              </TouchableOpacity>
-                                                   </View>
-             </View>
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => {
+                    setShowRejectionModal(false);
+                    setRejectionReason('');
+                    setSelectedReason('');
+                  }}
+                >
+                  <Text style={styles.cancelButtonText}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.modalButton, 
+                    styles.rejectButton,
+                    (!selectedReason || (selectedReason === 'autre' && !rejectionReason.trim())) && styles.disabledButton
+                  ]}
+                 onPress={() => {
+                   if (selectedAdhesion) {
+                     const finalReason = selectedReason === 'autre' ? rejectionReason : selectedReason;
+                     if (finalReason.trim()) {
+                       if (isAdminFormulaireContext) {
+                         handleRejectAdminFormulaire(selectedAdhesion.id, finalReason.trim());
+                       } else {
+                         handleRejectAdhesion(selectedAdhesion.id, finalReason.trim());
+                       }
+                     }
+                   }
+                   setShowRejectionModal(false);
+                   setRejectionReason('');
+                   setSelectedReason('');
+                 }}
+                  disabled={!selectedReason || (selectedReason === 'autre' && !rejectionReason.trim())}
+                >
+                  <Text style={styles.rejectButtonText}>Rejeter</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
            </TouchableWithoutFeedback>
           </KeyboardAvoidingView>
        </Modal>

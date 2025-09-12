@@ -9,14 +9,12 @@ export default function Index() {
   useEffect(() => {
     if (!isLoading) {
       if (isAuthenticated && user) {
-        // L'utilisateur est connecté, vérifier son statut d'adhésion
-        console.log('🔍 Index: Utilisateur authentifié, vérification du statut...');
-        console.log('📋 Statut utilisateur:', user);
         
         if (user.a_soumis_formulaire) {
           // L'utilisateur a soumis un formulaire, la redirection sera gérée par checkAuth
           console.log('✅ Index: Formulaire soumis, laissez checkAuth gérer la redirection');
           // Ne pas rediriger ici, laissez checkAuth faire son travail
+          router.replace('/(tabs)');
         } else {
           // L'utilisateur n'a pas soumis de formulaire, rediriger vers register
           console.log('📝 Index: Pas de formulaire soumis, redirection vers /register');

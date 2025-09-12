@@ -525,18 +525,25 @@ export interface CreerIdentifiantsRequest {
 export interface AdminFormulairePersonnelRequest {
   prenoms: string;
   nom: string;
-  date_naissance: string;
-  lieu_naissance: string;
-  adresse: string;
+  date_naissance?: string;
+  lieu_naissance?: string;
+  adresse?: string;
   profession: string;
-  ville_residence: string;
-  date_entree_congo: string;
-  employeur_ecole: string;
-  telephone: string;
-  url_image_formulaire: string;
+  ville_residence?: string;
+  date_entree_congo?: string;
+  employeur_ecole?: string;
+  telephone?: string;
+  url_image_formulaire?: string;
   numero_carte_consulaire?: string;
   email?: string;
   signature_url?: string;
+  selfie_photo_url?: string;
+  nombre_enfants?: number;
+  prenom_conjoint?: string;
+  nom_conjoint?: string;
+  date_emission_piece?: string;
+  nom_utilisateur?: string;
+  commentaire?: string;
 }
 
 export interface AdminFormulairePersonnelResponse {
@@ -602,6 +609,9 @@ export interface SecretaryAdminFormulairesResponse {
 
 export interface ApproveAdminFormulaireRequest {
   id_formulaire: number;
+  url_formulaire_final: string;
+  carte_recto_url?: string;
+  carte_verso_url?: string;
   commentaire?: string;
 }
 
@@ -609,9 +619,22 @@ export interface ApproveAdminFormulaireResponse {
   message: string;
   formulaire: {
     id: number;
+    type: string;
+    utilisateur: {
+      id: number;
+      nom_complet: string;
+      role: string;
+    };
     statut: 'APPROUVE';
-    date_validation: string;
-    valide_par: string;
+    numero_adhesion : string;
+    date_approbation: string;
+  };
+  actions_effectuees: string[];
+  cartes_membre?: {
+    recto_url: string;
+    verso_url: string;
+    generee_le: string;
+    generee_par: number;
   };
 }
 

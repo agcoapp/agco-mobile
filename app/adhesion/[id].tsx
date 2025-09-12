@@ -43,9 +43,6 @@ export default function AdhesionDetailsScreen() {
         try {
           setLoadingDetails(true);
           setError(null);
-
-          console.log('user ========> ', user);
-          
           // Si l'utilisateur est un MEMBRE, utiliser ses données directement
           if (user?.role === 'MEMBRE') {
             // Récupérer les données complètes de l'utilisateur
@@ -73,35 +70,54 @@ export default function AdhesionDetailsScreen() {
               setError('Données d\'adhésion non trouvées');
             }
           } else {
-            // Pour les autres rôles (PRESIDENT, SECRETAIRE_GENERALE), faire l'appel API
-            const adhesionDetails = await apiService.getAdhesionForms();
-            
-            // Trouver l'adhésion spécifique dans la liste
+            // Pour les autres rôles (PRESIDENT, SECRETAIRE_GENERALE), vérifier d'abord si c'est un formulaire d'administrateur
             let specificAdhesion = null;
             
-            if (adhesionDetails.donnees?.formulaires) {
-              specificAdhesion = adhesionDetails.donnees.formulaires.find(
-                (form: any) => form.id === parseInt(adhesionId)
-              );
-            } else if (adhesionDetails.formulaires) {
-              specificAdhesion = adhesionDetails.formulaires.find(
-                (form: any) => form.id === parseInt(adhesionId)
-              );
+            // D'abord, essayer de récupérer les formulaires d'administrateurs
+            try {
+              const adminFormulaires = await apiService.getSecretaryAdminFormulaires();
+              if (adminFormulaires?.donnees?.formulaires) {
+                specificAdhesion = adminFormulaires.donnees.formulaires.find(
+                  (form: any) => form.id === parseInt(adhesionId)
+                );
+                
+                if (specificAdhesion) {
+                  console.log('📊 Formulaire d\'administrateur trouvé:', specificAdhesion);
+                }
+              }
+            } catch (error) {
+              console.log('📊 Pas de formulaire d\'administrateur trouvé, recherche dans les adhésions normales');
             }
             
-            if (specificAdhesion && (specificAdhesion.formulaire_actuel?.donnees_snapshot || specificAdhesion.formulaire_adhesion)) {
+            // Si pas trouvé dans les formulaires d'administrateurs, chercher dans les adhésions normales
+            if (!specificAdhesion) {
+              const adhesionDetails = await apiService.getAdhesionForms();
+              
+              if (adhesionDetails.donnees?.formulaires) {
+                specificAdhesion = adhesionDetails.donnees.formulaires.find(
+                  (form: any) => form.id === parseInt(adhesionId)
+                );
+              } else if (adhesionDetails.formulaires) {
+                specificAdhesion = adhesionDetails.formulaires.find(
+                  (form: any) => form.id === parseInt(adhesionId)
+                );
+              }
+            }
+            
+            if (specificAdhesion && (specificAdhesion.formulaire_actuel?.donnees_snapshot || specificAdhesion.formulaire_adhesion || specificAdhesion.url_fiche_formulaire)) {
               // Créer l'objet adhésion avec seulement l'image du formulaire
               const adhesionData: AdhesionData = {
                 id: specificAdhesion.id,
-                nom_complet: specificAdhesion.nom_complet,
-                statut: specificAdhesion.statut,
-                date_soumission: specificAdhesion.date_soumission,
-                // Image du formulaire depuis formulaire_adhesion
+                nom_complet: specificAdhesion.nom_complet || specificAdhesion.utilisateur?.nom_complet || 'Nom non disponible',
+                statut: specificAdhesion.statut || 'EN_ATTENTE',
+                date_soumission: specificAdhesion.date_soumission || specificAdhesion.cree_le || new Date().toISOString(),
+                // Image du formulaire - gérer les deux cas (adhésions normales et formulaires d'administrateurs)
                 formulaireImage: specificAdhesion.formulaire_adhesion?.url_image_formulaire || 
-                                 specificAdhesion.formulaire_actuel?.url_image_formulaire || '',
+                                 specificAdhesion.formulaire_actuel?.url_image_formulaire || 
+                                 specificAdhesion.url_fiche_formulaire || '',
                 // Numéro d'adhésion si validée
-                adhesionNumber: specificAdhesion.numero_fiche || null,
-                status: specificAdhesion.statut === 'APPROUVE' ? 'validated' : 'pending'
+                adhesionNumber: specificAdhesion.numero_fiche || specificAdhesion.numero_adhesion || null,
+                status: (specificAdhesion.statut || 'EN_ATTENTE') === 'APPROUVE' ? 'validated' : 'pending'
               };
               
               setAdhesion(adhesionData);
@@ -280,7 +296,9 @@ export default function AdhesionDetailsScreen() {
           {adhesion?.formulaireImage && (
             <TouchableOpacity style={styles.downloadButton} onPress={handleDownloadAdhesion}>
               <Ionicons name="download-outline" size={24} color="white" />
-              <Text style={styles.downloadButtonText}>Télécharger la fiche d'adhésion</Text>
+              <Text style={styles.downloadButtonText}>
+                {adhesion?.nom_complet?.includes('LENGANDZI') ? 'Télécharger le formulaire d\'administrateur' : 'Télécharger la fiche d\'adhésion'}
+              </Text>
             </TouchableOpacity>
             
           )}
@@ -318,6 +336,41 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 16,
+  },
+  headerContainer: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1C1C1E',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 18,
+    color: '#8E8E93',
+    marginBottom: 16,
+  },
+  statusContainer: {
+    alignItems: 'flex-start',
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  statusText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
   loadingContainer: {
     flex: 1,

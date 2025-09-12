@@ -13,9 +13,9 @@ interface CustomDrawerContentProps {
 }
 
 export default function CustomDrawerContent(props: CustomDrawerContentProps) {
-  const { logout, user } = useAuth();
+  const { logout, user, userStatus } = useAuth();
   const { addToHistory } = useLastTab();
-
+  
   const handleLogout = () => {
     Alert.alert(
       'Déconnexion',
@@ -80,7 +80,7 @@ export default function CustomDrawerContent(props: CustomDrawerContentProps) {
          )}
 
         {/* Lien pour compléter le profil pour SECRETAIRE_GENERALE et PRESIDENT */}
-        {(user?.role === 'SECRETAIRE_GENERALE' || user?.role === 'PRESIDENT') && (
+        {(user?.role === 'SECRETAIRE_GENERALE' || user?.role === 'PRESIDENT') && !userStatus?.formulaire_adhesion?.donnees_snapshot?.employeur_ecole && (
            <TouchableOpacity
              style={styles.memberLink}
              onPress={() => {

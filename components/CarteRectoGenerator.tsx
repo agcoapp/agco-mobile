@@ -23,6 +23,10 @@ const CarteRectoGenerator = forwardRef<CarteRectoGeneratorRef, CarteRectoGenerat
     const webViewRef = useRef<WebView>(null);
 
     const generateHTML = (memberData: any, logoBase64?: string, photoUrl?: string, adhesionNumber?: string) => {
+      
+      const donneesSnapshot = memberData.formulaire_actuel?.donnees_snapshot || memberData.donnees_snapshot;
+      const telephone = memberData.telephone || donneesSnapshot?.telephone;
+      
       const rectoHTML = `
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -90,23 +94,23 @@ const CarteRectoGenerator = forwardRef<CarteRectoGeneratorRef, CarteRectoGenerat
             <div style="position: absolute; width: 440px; height: 230px; top: 0; left: 24px; font-family: 'Inter'; font-weight: normal; color: black; font-size: 22px; letter-spacing: 0; line-height: normal;">
               <div style="margin-bottom: 3px;">
                 <span style="font-family: 'Inter'; font-weight: normal; color: black; font-size: 24px; letter-spacing: 0;">Nom(s) :</span>
-                <span style="font-family: 'Inter'; font-weight: bold; color: black; font-size: 24px;">${memberData.formulaire_actuel?.donnees_snapshot?.nom || 'Non spécifié'}</span>
+                <span style="font-family: 'Inter'; font-weight: bold; color: black; font-size: 24px;">${donneesSnapshot?.nom || 'Non spécifié'}</span>
               </div>
               <div style="margin-bottom: 3px;">
                 <span style="font-family: 'Inter'; font-weight: normal; color: black; font-size: 24px; letter-spacing: 0;">Prénom(s) :</span>
-                <span style="font-family: 'Inter'; font-weight: bold; color: black; font-size: 24px;">${memberData.formulaire_actuel?.donnees_snapshot?.prenoms || 'Non spécifié'}</span>
+                <span style="font-family: 'Inter'; font-weight: bold; color: black; font-size: 24px;">${donneesSnapshot?.prenoms || 'Non spécifié'}</span>
               </div>
               <div style="margin-bottom: 3px;">
                 <span style="font-family: 'Inter'; font-weight: normal; color: black; font-size: 24px; letter-spacing: 0;">Fonction :</span>
-                <span style="font-family: 'Inter'; font-weight: bold; color: black; font-size: 24px;">${memberData.formulaire_actuel?.donnees_snapshot?.profession || 'Membre'}</span>
+                <span style="font-family: 'Inter'; font-weight: bold; color: black; font-size: 24px;">${donneesSnapshot?.profession || 'Membre'}</span>
               </div>
               <div style="margin-bottom: 3px;">
                 <span style="font-family: 'Inter'; font-weight: normal; color: black; font-size: 24px; letter-spacing: 0;">Date de Naissance :</span>
-                <span style="font-family: 'Inter'; font-weight: bold; color: black; font-size: 24px;">${memberData.formulaire_actuel?.donnees_snapshot?.date_naissance || 'Non spécifiée'}</span>
+                <span style="font-family: 'Inter'; font-weight: bold; color: black; font-size: 24px;">${donneesSnapshot?.date_naissance || 'Non spécifiée'}</span>
               </div>
               <div style="margin-bottom: 3px;">
                 <span style="font-family: 'Inter'; font-weight: normal; color: black; font-size: 24px; letter-spacing: 0;">Téléphone :</span>
-                <span style="font-family: 'Inter'; font-weight: bold; color: black; font-size: 24px;">${memberData.telephone || 'Non spécifié'}</span>
+                <span style="font-family: 'Inter'; font-weight: bold; color: black; font-size: 24px;">${telephone || 'Non spécifié'}</span>
               </div>
               <div style="margin-bottom: 3px;">
                 <span style="font-family: 'Inter'; font-weight: normal; color: black; font-size: 24px; letter-spacing: 0;">N° :</span>
