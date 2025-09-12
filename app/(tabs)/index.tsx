@@ -60,6 +60,8 @@ export default function DashboardScreen() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [totalMembersCount, setTotalMembersCount] = useState(0);
+  const [isLoadingMembersCount, setIsLoadingMembersCount] = useState(false);
   
 
   useEffect(() => {
@@ -95,9 +97,26 @@ export default function DashboardScreen() {
   }, [user]);
 
   const onRefresh = async () => {
-    // Ne pas rafraîchir les statistiques si l'utilisateur n'est pas connecté ou s'il est un membre
-    if (!user || user?.role === 'MEMBRE') {
+    // Ne pas rafraîchir les statistiques si l'utilisateur n'est pas connecté
+    if (!user) {
       setRefreshing(false);
+      return;
+    }
+    
+    // Si c'est un membre, rafraîchir seulement le nombre de membres
+    if (user?.role === 'MEMBRE') {
+      try {
+        const memberDirectory = await apiService.getMemberDirectory();
+        if (memberDirectory?.donnees?.pagination?.total) {
+          setTotalMembersCount(memberDirectory.donnees.pagination.total);
+        } else if (memberDirectory?.donnees?.membres) {
+          setTotalMembersCount(memberDirectory.donnees.membres.length);
+        }
+      } catch (error) {
+        console.error('Erreur lors du rafraîchissement du nombre de membres:', error);
+      } finally {
+        setRefreshing(false);
+      }
       return;
     }
     
@@ -370,6 +389,33 @@ export default function DashboardScreen() {
     loadMemberCardImages();
   }, [user]);
 
+  // Charger le nombre total de membres
+  useEffect(() => {
+    const loadMembersCount = async () => {
+      if (user?.role === 'MEMBRE') {
+        try {
+          setIsLoadingMembersCount(true);
+          const memberDirectory = await apiService.getMemberDirectory();
+          console.log('Member directory:', memberDirectory);
+          
+          // Récupérer le nombre total de membres depuis la pagination
+          if (memberDirectory?.donnees?.pagination?.total) {
+            setTotalMembersCount(memberDirectory.donnees.pagination.total);
+          } else if (memberDirectory?.donnees?.membres) {
+            setTotalMembersCount(memberDirectory.donnees.membres.length);
+          }
+        } catch (error) {
+          console.error('Erreur lors du chargement du nombre de membres:', error);
+          setTotalMembersCount(0);
+        } finally {
+          setIsLoadingMembersCount(false);
+        }
+      }
+    };
+
+    loadMembersCount();
+  }, [user]);
+
   const handleCardClick = (route: string) => {
     if (route === '/membres') {
       router.push('/(tabs)/membres');
@@ -378,6 +424,27 @@ export default function DashboardScreen() {
     } else if (route === '/cartes') {
       router.push('/(tabs)/cartes');
     } else if (route === '/codes') {
+      router.push('/(tabs)/codes');
+    }
+  };
+
+  const handleStatCardClick = (card: any) => {
+    if (card.route === '/membres') {
+      router.push('/(tabs)/membres');
+    } else if (card.route === '/adhesions') {
+      // Déterminer quel onglet afficher selon le type de carte
+      if (card.title === 'Adhésions En Attente') {
+        router.push('/(tabs)/adhesions?tab=pending');
+      } else if (card.title === 'Adhésions Validées') {
+        router.push('/(tabs)/adhesions?tab=validated');
+      } else if (card.title === 'Adhésions Rejetées') {
+        router.push('/(tabs)/adhesions?tab=rejected');
+      } else {
+        router.push('/(tabs)/adhesions');
+      }
+    } else if (card.route === '/cartes') {
+      router.push('/(tabs)/cartes');
+    } else if (card.route === '/codes') {
       router.push('/(tabs)/codes');
     }
   };
@@ -402,6 +469,25 @@ export default function DashboardScreen() {
                 Association des Gabonais du Congo (AGCO)
               </Text>
             </View>
+
+            {/* Statistiques des membres */}
+            <View style={styles.statsSection}>
+              <Text style={styles.sectionTitle}>Statistiques</Text>
+              <View style={[styles.statsGrid, { justifyContent: 'center' }]}>
+                <TouchableOpacity
+                  style={styles.statCard}
+                  onPress={() => router.push('/(tabs)/membres')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="people-outline" size={40} color="#007AFF" />
+                  <Text style={[styles.statValue, { color: '#007AFF' }]}>
+                    {isLoadingMembersCount ? '...' : totalMembersCount}
+                  </Text>
+                  <Text style={styles.statTitle}>Total Des Membres</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
 
             {/* Carte membre complète avec recto/verso */}
             <View style={styles.cardSection}>
@@ -478,7 +564,6 @@ export default function DashboardScreen() {
               </TouchableOpacity>
             </View>
 
-
             {/* Actions rapides */}
             <View style={styles.actionsSection}>
               <Text style={styles.sectionTitle}>Actions Rapides</Text>
@@ -508,15 +593,6 @@ export default function DashboardScreen() {
                   <Ionicons name="key-outline" size={48} color="#AF52DE" />
                   <Text style={styles.actionTitle}>Sécurité du compte</Text>
                   <Text style={styles.actionSubtitle}>Changer votre mot de passe</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.actionCard}
-                  onPress={() => router.push('/(tabs)/membres')}
-                >
-                  <Ionicons name="card-outline" size={48} color="#34C759" />
-                  <Text style={styles.actionTitle}>Ma carte de membre</Text>
-                  <Text style={styles.actionSubtitle}>Télécharger ma carte de membre</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -594,7 +670,7 @@ export default function DashboardScreen() {
           <Text style={styles.mainTitle}>Tableau De Bord</Text>
           
           {/* Cartes de statistiques */}
-          <View style={styles.statsGrid}>
+          <View style={[styles.statsGrid, { justifyContent: 'space-between' }]}>
             {isLoading ? (
               // Affichage du chargement
               Array.from({ length: 4 }).map((_, index) => (
@@ -618,7 +694,7 @@ export default function DashboardScreen() {
                 <TouchableOpacity
                   key={index}
                   style={styles.statCard}
-                  onPress={() => handleCardClick(card.route)}
+                  onPress={() => handleStatCardClick(card)}
                   activeOpacity={0.7}
                 >
                   <Ionicons name={card.icon as any} size={40} color={card.color} />
@@ -776,7 +852,6 @@ const styles = StyleSheet.create({
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
     marginBottom: 32,
   },
   statCard: {
@@ -860,6 +935,9 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
     fontWeight: '600',
+  },
+  statsSection: {
+    marginBottom: 32,
   },
   actionsSection: {
     marginBottom: 32,

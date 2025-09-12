@@ -1,21 +1,22 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Keyboard,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  RefreshControl,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Keyboard,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    RefreshControl,
+    SafeAreaView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View
 } from 'react-native';
 
 import AdhesionFormGenerator, { AdhesionFormGeneratorRef } from '../../components/AdhesionFormGenerator';
@@ -45,7 +46,17 @@ export default function AdhesionsScreen() {
   const { user } = useAuth();
   const { handleBackNavigation } = useNavigationHistory();
   const router = useRouterWithHistory();
-  const [tabValue, setTabValue] = useState(0);
+  const { tab } = useLocalSearchParams();
+  
+  // Déterminer l'onglet initial basé sur les paramètres de navigation
+  const getInitialTabValue = () => {
+    if (tab === 'pending') return 0;
+    if (tab === 'validated') return 1;
+    if (tab === 'rejected') return 2;
+    return 0; // Par défaut, onglet "En attente"
+  };
+  
+  const [tabValue, setTabValue] = useState(getInitialTabValue());
   const [searchTerm, setSearchTerm] = useState('');
   const [adhesions, setAdhesions] = useState<AdhesionForm[]>([]);
   const [loading, setLoading] = useState(false);
@@ -87,6 +98,12 @@ export default function AdhesionsScreen() {
     ];
     return steps[step] || "";
   };
+
+  // Mettre à jour l'onglet quand les paramètres de navigation changent
+  useEffect(() => {
+    const newTabValue = getInitialTabValue();
+    setTabValue(newTabValue);
+  }, [tab]);
 
   // Charger les formulaires d'adhésion
   useEffect(() => {

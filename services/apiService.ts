@@ -521,6 +521,116 @@ export interface CreerIdentifiantsRequest {
   id_utilisateur: number;
 }
 
+// Interfaces pour les formulaires d'administrateurs
+export interface AdminFormulairePersonnelRequest {
+  prenoms: string;
+  nom: string;
+  date_naissance: string;
+  lieu_naissance: string;
+  adresse: string;
+  profession: string;
+  ville_residence: string;
+  date_entree_congo: string;
+  employeur_ecole: string;
+  telephone: string;
+  url_image_formulaire: string;
+  numero_carte_consulaire?: string;
+  email?: string;
+  signature_url?: string;
+}
+
+export interface AdminFormulairePersonnelResponse {
+  message: string;
+  formulaire: {
+    id: number;
+    type: string;
+    statut: 'EN_ATTENTE' | 'APPROUVE' | 'REJETE';
+    date_soumission: string;
+    url_image_formulaire: string;
+    donnees_snapshot: any;
+  };
+}
+
+export interface AdminFormulaireStatutResponse {
+  message: string;
+  formulaire: {
+    id: number;
+    type: string;
+    statut: 'EN_ATTENTE' | 'APPROUVE' | 'REJETE';
+    date_soumission: string;
+    url_image_formulaire: string;
+    donnees_snapshot: any;
+    raison_rejet?: string;
+    date_validation?: string;
+    valide_par?: string;
+  } | null;
+}
+
+export interface AdminFormulaireSchemaResponse {
+  message: string;
+  schema: {
+    champs_requis: string[];
+    champs_optionnels: string[];
+    exemples: any;
+    regles_validation: any;
+  };
+}
+
+export interface SecretaryAdminFormulairesResponse {
+  message: string;
+  donnees: {
+    formulaires: Array<{
+      id: number;
+      type: string;
+      statut: 'EN_ATTENTE' | 'APPROUVE' | 'REJETE';
+      date_soumission: string;
+      url_image_formulaire: string;
+      donnees_snapshot: any;
+      utilisateur: {
+        id: number;
+        nom_utilisateur: string;
+        nom_complet: string;
+        role: string;
+      };
+      raison_rejet?: string;
+      date_validation?: string;
+      valide_par?: string;
+    }>;
+    pagination: Pagination;
+  };
+}
+
+export interface ApproveAdminFormulaireRequest {
+  id_formulaire: number;
+  commentaire?: string;
+}
+
+export interface ApproveAdminFormulaireResponse {
+  message: string;
+  formulaire: {
+    id: number;
+    statut: 'APPROUVE';
+    date_validation: string;
+    valide_par: string;
+  };
+}
+
+export interface RejectAdminFormulaireRequest {
+  id_formulaire: number;
+  raison: string;
+}
+
+export interface RejectAdminFormulaireResponse {
+  message: string;
+  formulaire: {
+    id: number;
+    statut: 'REJETE';
+    raison_rejet: string;
+    date_validation: string;
+    valide_par: string;
+  };
+}
+
 export interface CreerIdentifiantsResponse {
   message: string;
 }
@@ -1120,6 +1230,49 @@ class ApiService {
 
     this.requestQueue.set(key, requestPromise);
     return requestPromise;
+  }
+
+  // Méthodes pour les formulaires d'administrateurs
+  async submitAdminFormulairePersonnel(data: AdminFormulairePersonnelRequest): Promise<AdminFormulairePersonnelResponse> {
+    const response = await this.axiosInstance.post('/api/admin/formulaire-personnel', data);
+    return response.data;
+  }
+
+  async getAdminFormulairePersonnelStatut(): Promise<AdminFormulaireStatutResponse> {
+    const response = await this.axiosInstance.get('/api/admin/formulaire-personnel/statut');
+    return response.data;
+  }
+
+  async getAdminFormulairePersonnelSchema(): Promise<AdminFormulaireSchemaResponse> {
+    const response = await this.axiosInstance.get('/api/admin/formulaire-personnel/schema');
+    return response.data;
+  }
+
+  // Méthodes pour le secrétariat - gestion des formulaires d'administrateurs
+  async getSecretaryAdminFormulaires(params?: {
+    page?: number;
+    limite?: number;
+    filtre?: 'tous' | 'en_attente' | 'approuves' | 'rejetes';
+    recherche?: string;
+  }): Promise<SecretaryAdminFormulairesResponse> {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.limite) searchParams.append('limite', params.limite.toString());
+    if (params?.filtre) searchParams.append('filtre', params.filtre);
+    if (params?.recherche) searchParams.append('recherche', params.recherche);
+
+    const response = await this.axiosInstance.get(`/api/secretaire/formulaires-admin?${searchParams}`);
+    return response.data;
+  }
+
+  async approveAdminFormulaire(data: ApproveAdminFormulaireRequest): Promise<ApproveAdminFormulaireResponse> {
+    const response = await this.axiosInstance.post('/api/secretaire/approuver-formulaire-admin', data);
+    return response.data;
+  }
+
+  async rejectAdminFormulaire(data: RejectAdminFormulaireRequest): Promise<RejectAdminFormulaireResponse> {
+    const response = await this.axiosInstance.post('/api/secretaire/rejeter-formulaire-admin', data);
+    return response.data;
   }
 }
 

@@ -536,12 +536,6 @@ export default function DocumentsScreen() {
     });
   };
 
-  // Fonction pour effacer tous les filtres
-  const clearFilters = () => {
-    setSearchTerm('');
-    setDateFilter('');
-  };
-
   // Fonction pour générer les styles des éléments de liste
   const getListItemStyles = (docTitle: string) => {
     const isNewlyAdded = newlyAddedDocument === docTitle;

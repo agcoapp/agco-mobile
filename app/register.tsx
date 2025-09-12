@@ -6,21 +6,21 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    Image,
-    Keyboard,
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View
 } from 'react-native';
 
 import AdhesionFormGenerator, { AdhesionFormGeneratorRef } from '../components/AdhesionFormGenerator';
@@ -809,12 +809,6 @@ export default function RegisterScreen() {
       // 3. Générer l'image PNG de la fiche d'adhésion avec les URLs Cloudinary
       setCurrentStep(2); // Étape 3: Génération de l'image de la fiche d'adhésion
       console.log('=== DÉBUT GÉNÉRATION FORMULAIRE PNG ===');
-      console.log('Données pour génération:', {
-        firstName: adhesionData.firstName,
-        lastName: adhesionData.lastName,
-        photoUrl: cloudinaryPhotoUrl,
-        signatureUrl: cloudinarySignatureUrl
-      });
       
       // Utiliser l'AdhesionFormGenerator pour générer le PNG
       if (!formGeneratorRef.current) {
@@ -881,38 +875,77 @@ export default function RegisterScreen() {
       setCurrentStep(4); // Étape 5: Finalisation
       setIsLoading(false);
 
-      // Soumettre l'adhésion via l'API
-      const response = await apiService.submitAdhesion(jsonDataToSend);
+      // Soumettre l'adhésion via l'API selon le rôle de l'utilisateur
+      let response;
+      if (user?.role === 'SECRETAIRE_GENERALE' || user?.role === 'PRESIDENT') {
+        // Pour les administrateurs, utiliser l'API des formulaires personnels
+        const adminData = {
+          prenoms: formData.firstName,
+          nom: formData.lastName,
+          date_naissance: formatDateToDDMMYYYY(formData.birthDate),
+          lieu_naissance: formData.birthPlace,
+          adresse: formData.address,
+          profession: formData.profession,
+          ville_residence: formData.city,
+          date_entree_congo: formatDateToDDMMYYYY(formData.entryDate),
+          employeur_ecole: formData.employer,
+          telephone: formData.phone,
+          url_image_formulaire: cloudinaryFormUrl,
+          numero_carte_consulaire: formData.idNumber || '',
+          email: user?.email || '',
+          signature_url: cloudinarySignatureUrl || ''
+        };
+        console.log('Données JSON pour les administrateurs:', adminData);
+        response = await apiService.submitAdminFormulairePersonnel(adminData);
+      } else {
+        // Pour les membres normaux, utiliser l'API d'adhésion standard
+        response = await apiService.submitAdhesion(jsonDataToSend);
+      }
 
       console.log('Réponse de l\'API:', response);
 
-      // Définir le message selon le mode
-      const message = isEditing 
-        ? "La fiche d'adhésion a été mise à jour avec succès"
-        : "L'adhésion est bel et bien soumise";
+      // Définir le message selon le mode et le rôle
+      let message;
+      if (user?.role === 'SECRETAIRE_GENERALE' || user?.role === 'PRESIDENT') {
+        message = isEditing 
+          ? "Votre formulaire personnel a été mis à jour avec succès"
+          : "Votre formulaire personnel a été soumis avec succès";
+      } else {
+        message = isEditing 
+          ? "La fiche d'adhésion a été mise à jour avec succès"
+          : "L'adhésion est bel et bien soumise";
+      }
       
              Alert.alert('Succès', message, [
          {
            text: 'OK',
            onPress: async () => {
              try {
-                               // Nettoyer les images temporaires
-                await cleanupTempImages();
-                
-                // Vider complètement AsyncStorage
-                await AsyncStorage.clear();
-                console.log('🧹 AsyncStorage complètement vidé');
-                
-                // Déconnecter l'utilisateur
-                await apiService.logout();
-                console.log('👋 Utilisateur déconnecté');
-                
-                // Rediriger vers l'écran de login
-                router.replace('/login');
+               // Nettoyer les images temporaires
+               await cleanupTempImages();
+               
+               if (user?.role === 'SECRETAIRE_GENERALE' || user?.role === 'PRESIDENT') {
+                 // Pour les administrateurs, ne pas déconnecter, juste rediriger vers le tableau de bord
+                 console.log('👤 Administrateur - Redirection vers le tableau de bord');
+                 router.replace('/(tabs)');
+               } else {
+                 // Pour les membres normaux, déconnecter et rediriger vers login
+                 await AsyncStorage.clear();
+                 console.log('🧹 AsyncStorage complètement vidé');
+                 
+                 await apiService.logout();
+                 console.log('👋 Utilisateur déconnecté');
+                 
+                 router.replace('/login');
+               }
              } catch (error) {
-               console.error('Erreur lors de la déconnexion:', error);
-               // En cas d'erreur, rediriger quand même vers login
-               router.replace('/login');
+               console.error('Erreur lors de la redirection:', error);
+               // En cas d'erreur, rediriger selon le rôle
+               if (user?.role === 'SECRETAIRE_GENERALE' || user?.role === 'PRESIDENT') {
+                 router.replace('/(tabs)');
+               } else {
+                 router.replace('/login');
+               }
              }
            }
          }

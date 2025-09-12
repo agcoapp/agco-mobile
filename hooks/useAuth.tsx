@@ -131,6 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
         
         setUser(user);
+        setUserStatus(userStatus);
         await AsyncStorage.setItem('sgm_user', JSON.stringify(userStatus));
         
         // Appliquer la même logique de redirection (fallback)
@@ -193,6 +194,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
       
       setUser(user);
+      setUserStatus(userStatus);
       
       await AsyncStorage.setItem('sgm_user', JSON.stringify(userStatus));
       
@@ -283,11 +285,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await apiService.logout();
       setUser(null);
+      setUserStatus(null);
       await AsyncStorage.multiRemove(['sgm_user', 'sgm_token']);
       router.replace('/login');
     } catch (error) {
       console.error('Erreur lors de la déconnexion:', error);
       setUser(null);
+      setUserStatus(null);
       await AsyncStorage.multiRemove(['sgm_user', 'sgm_token']);
       router.replace('/login');
     }
@@ -296,6 +300,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateUserProfile = async () => {
     try {
       const updatedUserStatus = await apiService.getUserStatus();
+      console.log("updatedUserStatus", updatedUserStatus);
       setUserStatus(updatedUserStatus);
       
       const user: User = {
@@ -310,7 +315,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: '',
         telephone: ''
       };
-      
+            
       setUser(user);
       await AsyncStorage.setItem('sgm_user', JSON.stringify(updatedUserStatus));
       console.log('✅ Profil utilisateur mis à jour dans AsyncStorage et l\'état');

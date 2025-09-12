@@ -78,6 +78,20 @@ export default function CustomDrawerContent(props: CustomDrawerContentProps) {
              <Text style={styles.memberLinkText}>Ma fiche d'adhésion</Text>
            </TouchableOpacity>
          )}
+
+        {/* Lien pour compléter le profil pour SECRETAIRE_GENERALE et PRESIDENT */}
+        {(user?.role === 'SECRETAIRE_GENERALE' || user?.role === 'PRESIDENT') && (
+           <TouchableOpacity
+             style={styles.memberLink}
+             onPress={() => {
+               router.push('/register');
+             }}
+             activeOpacity={0.7}
+           >
+             <Ionicons name="create-outline" size={24} color="#666" />
+             <Text style={styles.memberLinkText}>Compléter votre profil</Text>
+           </TouchableOpacity>
+         )}
         
         {/* Bouton de déconnexion */}
         <View style={styles.logoutSection}>
@@ -125,11 +139,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 15,
     backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
   },
   memberLinkText: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '500',
     color: '#666',
     marginLeft: 12,
