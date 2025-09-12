@@ -1,11 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import {
-    ActivityIndicator,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 
 interface LoadingScreenProps {
@@ -22,7 +22,7 @@ export default function LoadingScreen({ message = 'Chargement...' }: LoadingScre
           color="#007AFF"
           style={styles.icon}
         />
-        <Text style={styles.title}>SGM Mobile</Text>
+        <Text style={styles.title}>AGCO</Text>
         <Text style={styles.subtitle}>Gestion des Membres</Text>
         
         <View style={styles.loadingContainer}>

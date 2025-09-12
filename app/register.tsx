@@ -6,21 +6,21 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    Image,
-    Keyboard,
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View
 } from 'react-native';
 
 import AdhesionFormGenerator, { AdhesionFormGeneratorRef } from '../components/AdhesionFormGenerator';
@@ -809,12 +809,6 @@ export default function RegisterScreen() {
       // 3. Générer l'image PNG de la fiche d'adhésion avec les URLs Cloudinary
       setCurrentStep(2); // Étape 3: Génération de l'image de la fiche d'adhésion
       console.log('=== DÉBUT GÉNÉRATION FORMULAIRE PNG ===');
-      console.log('Données pour génération:', {
-        firstName: adhesionData.firstName,
-        lastName: adhesionData.lastName,
-        photoUrl: cloudinaryPhotoUrl,
-        signatureUrl: cloudinarySignatureUrl
-      });
       
       // Utiliser l'AdhesionFormGenerator pour générer le PNG
       if (!formGeneratorRef.current) {

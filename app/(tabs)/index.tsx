@@ -509,15 +509,6 @@ export default function DashboardScreen() {
                   <Text style={styles.actionTitle}>Sécurité du compte</Text>
                   <Text style={styles.actionSubtitle}>Changer votre mot de passe</Text>
                 </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.actionCard}
-                  onPress={() => router.push('/(tabs)/membres')}
-                >
-                  <Ionicons name="card-outline" size={48} color="#34C759" />
-                  <Text style={styles.actionTitle}>Ma carte de membre</Text>
-                  <Text style={styles.actionSubtitle}>Télécharger ma carte de membre</Text>
-                </TouchableOpacity>
               </View>
             </View>
           </View>
