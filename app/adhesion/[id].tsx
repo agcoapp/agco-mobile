@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Modal,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -15,6 +16,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import ImageViewer from '../../components/ui/ImageViewer';
 import { useAuth } from '../../hooks/useAuth';
 import { apiService } from '../../services/apiService';
 
@@ -34,6 +36,7 @@ export default function AdhesionDetailsScreen() {
   const [adhesion, setAdhesion] = useState<AdhesionData | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showImageViewer, setShowImageViewer] = useState(false);
 
   // Récupérer les détails de l'adhésion
   useEffect(() => {
@@ -307,13 +310,21 @@ export default function AdhesionDetailsScreen() {
         {/* Image du formulaire */}
         <View style={styles.imageContainer}>
           {adhesion.formulaireImage ? (
-            <View style={styles.imageWrapper}>
+            <TouchableOpacity 
+              style={styles.imageWrapper}
+              onPress={() => setShowImageViewer(true)}
+              activeOpacity={0.8}
+            >
               <Image
                 source={{ uri: adhesion.formulaireImage }}
                 style={styles.formImage}
                 resizeMode="contain"
               />
-            </View>
+              <View style={styles.zoomOverlay}>
+                <Ionicons name="search-outline" size={24} color="rgba(255, 255, 255, 0.8)" />
+                <Text style={styles.zoomText}>Appuyez pour zoomer</Text>
+              </View>
+            </TouchableOpacity>
           ) : (
             <View style={styles.noImageContainer}>
               <Ionicons name="image-outline" size={64} color="#8E8E93" />
@@ -324,6 +335,19 @@ export default function AdhesionDetailsScreen() {
           )}
         </View>
       </ScrollView>
+
+      {/* Modal pour l'image zoomable */}
+      <Modal
+        visible={showImageViewer}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowImageViewer(false)}
+      >
+        <ImageViewer
+          imageUri={adhesion.formulaireImage}
+          onClose={() => setShowImageViewer(false)}
+        />
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -468,6 +492,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
     elevation: 5,
+    position: 'relative',
   },
   formImage: {
     width: '100%',
@@ -487,5 +512,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#8E8E93',
     textAlign: 'center',
+  },
+  zoomOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  zoomText: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 8,
   },
 });
