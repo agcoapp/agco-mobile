@@ -18,6 +18,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import ImageViewer from '../../components/ui/ImageViewer';
 import { useAuth } from '../../hooks/useAuth';
 import { apiService } from '../../services/apiService';
 
@@ -836,28 +837,19 @@ export default function CartesScreen() {
         </View>
       )}
 
-      {/* Modal pour afficher l'image en plein écran */}
+      {/* Modal pour afficher l'image en plein écran avec zoom */}
       <Modal
         visible={isModalVisible}
         transparent={true}
         animationType="fade"
         onRequestClose={closeImageModal}
       >
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity
-            style={styles.modalCloseButton}
-            onPress={closeImageModal}
-          >
-            <Ionicons name="close" size={30} color="white" />
-          </TouchableOpacity>
-          {selectedImage && (
-            <Image
-              source={{ uri: selectedImage }}
-              style={styles.modalImage}
-              resizeMode="contain"
-            />
-          )}
-        </View>
+        {selectedImage && (
+          <ImageViewer
+            imageUri={selectedImage}
+            onClose={closeImageModal}
+          />
+        )}
       </Modal>
     </SafeAreaView>
   );
