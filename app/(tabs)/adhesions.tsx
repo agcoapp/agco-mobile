@@ -75,10 +75,6 @@ export default function AdhesionsScreen() {
   const [isValidating, setIsValidating] = useState(false);
 
   // États pour les formulaires d'administrateurs
-  const [adminFormulaires, setAdminFormulaires] = useState<any[]>([]);
-  const [adminTabValue, setAdminTabValue] = useState(0);
-  const [showAdminFormulaires, setShowAdminFormulaires] = useState(false);
-  const [loadingAdminFormulaires, setLoadingAdminFormulaires] = useState(false);
   const [isAdminFormulaireContext, setIsAdminFormulaireContext] = useState(false);
 
   // Références aux générateurs
@@ -167,8 +163,32 @@ export default function AdhesionsScreen() {
           processedData = validData;
         }
         
-        console.log(`📋 ${processedData.length} adhésions chargées avec succès`);
-        setAdhesions(processedData);
+        // Récupérer les formulaires d'administrateur
+        let adminFormulaires: any[] = [];
+        try {
+          const adminData = await apiService.getSecretaryAdminFormulaires();
+          if (adminData?.donnees?.formulaires) {
+            adminFormulaires = adminData.donnees.formulaires;
+            console.log("📋 Formulaires admin trouvés:", adminFormulaires.length);
+          }
+        } catch (adminError) {
+          console.log('Pas de formulaires d\'administrateur trouvés:', adminError);
+        }
+        
+        // Combiner les formulaires normaux avec les formulaires d'administrateur
+        const allFormulaires = [...processedData, ...adminFormulaires];
+        
+        console.log(`📋 ${processedData.length} adhésions normales + ${adminFormulaires.length} formulaires admin = ${allFormulaires.length} formulaires total chargés`);
+        
+        // Debug : afficher la structure des premiers éléments
+        if (allFormulaires.length > 0) {
+          console.log("🔍 Structure premier formulaire:", allFormulaires[0]);
+          if (adminFormulaires.length > 0) {
+            console.log("🔍 Structure premier formulaire admin:", adminFormulaires[0]);
+          }
+        }
+        
+        setAdhesions(allFormulaires);
         
       } catch (error) {
         console.error('❌ Erreur lors du chargement des formulaires d\'adhésion:', error);
@@ -226,8 +246,23 @@ export default function AdhesionsScreen() {
         processedData = validData;
       }
       
-      console.log(`📋 ${processedData.length} adhésions rechargées avec succès`);
-      setAdhesions(processedData);
+      // Récupérer les formulaires d'administrateur
+      let adminFormulaires: any[] = [];
+      try {
+        const adminData = await apiService.getSecretaryAdminFormulaires();
+        if (adminData?.donnees?.formulaires) {
+          adminFormulaires = adminData.donnees.formulaires;
+          console.log("📋 Formulaires admin trouvés (refresh):", adminFormulaires.length);
+        }
+      } catch (adminError) {
+        console.log('Pas de formulaires d\'administrateur trouvés (refresh):', adminError);
+      }
+      
+      // Combiner les formulaires normaux avec les formulaires d'administrateur
+      const allFormulaires = [...processedData, ...adminFormulaires];
+      
+      console.log(`📋 ${processedData.length} adhésions normales + ${adminFormulaires.length} formulaires admin = ${allFormulaires.length} formulaires total rechargés`);
+      setAdhesions(allFormulaires);
       
     } catch (error) {
       console.error('❌ Erreur lors du rafraîchissement des formulaires d\'adhésion:', error);
@@ -252,53 +287,7 @@ export default function AdhesionsScreen() {
     }
   };
 
-  // Compter les formulaires d'administrateurs par statut
-  const getAdminTabCount = (status: 'EN_ATTENTE' | 'APPROUVE' | 'REJETE') => {
-    try {
-      if (!Array.isArray(adminFormulaires)) return 0;
-      
-      // Pour les formulaires d'administrateurs, si pas de statut défini, considérer comme EN_ATTENTE
-      return adminFormulaires.filter((a: any) => {
-        if (!a || typeof a !== 'object') return false;
-        
-        // Si pas de champ statut, considérer comme EN_ATTENTE
-        const formulaireStatus = a.statut || 'EN_ATTENTE';
-        return formulaireStatus === status;
-      }).length;
-    } catch (error) {
-      console.error('❌ Erreur lors du comptage des formulaires d\'administrateurs:', error);
-      return 0;
-    }
-  };
 
-  // Charger les formulaires d'administrateurs
-  const loadAdminFormulaires = async () => {
-    try {
-      setLoadingAdminFormulaires(true);
-      const response = await apiService.getSecretaryAdminFormulaires();
-      console.log('📊 Formulaires d\'administrateurs reçus:', response.donnees.formulaires);
-
-      if (response?.donnees?.formulaires) {
-        setAdminFormulaires(response.donnees.formulaires);
-        console.log('📊 Formulaires d\'administrateurs définis:', response.donnees.formulaires);
-        console.log('📊 Nombre total de formulaires:', response.donnees.formulaires.length);
-        
-        // Debug: compter par statut
-        const enAttente = response.donnees.formulaires.filter((f: any) => !f.statut || f.statut === 'EN_ATTENTE').length;
-        const valides = response.donnees.formulaires.filter((f: any) => f.statut === 'APPROUVE').length;
-        const rejetes = response.donnees.formulaires.filter((f: any) => f.statut === 'REJETE').length;
-        console.log('📊 Répartition:', { enAttente, valides, rejetes });
-      } else {
-        setAdminFormulaires([]);
-        console.log('📊 Aucun formulaire d\'administrateur trouvé');
-      }
-    } catch (error) {
-      console.error('❌ Erreur lors du chargement des formulaires d\'administrateurs:', error);
-      setAdminFormulaires([]);
-    } finally {
-      setLoadingAdminFormulaires(false);
-    }
-  };
 
   // Valider un formulaire d'administrateur
   const handleValidateAdminFormulaire = async (id: number) => {
@@ -444,12 +433,8 @@ export default function AdhesionsScreen() {
       console.log('✅ PNG final avec numéro d\'adhésion:', finalUrl);
       console.log('✅ Cartes RECTO et VERSO régénérées et réuploadées avec succès !');
 
-      // Mettre à jour la liste locale
-      const updatedAdminFormulaires = adminFormulaires.map((a: any) => 
-        a.id === id ? { ...a, statut: 'APPROUVE' as const } : a
-      );
-      
-      setAdminFormulaires(updatedAdminFormulaires);
+      // Mettre à jour la liste locale - les formulaires d'admin sont maintenant dans la liste principale
+      // Pas besoin de mise à jour séparée
       
       // Réinitialiser les états de validation
       setIsValidating(false);
@@ -491,11 +476,8 @@ export default function AdhesionsScreen() {
       
       console.log('✅ Formulaire d\'administrateur rejeté:', result);
 
-      // Mettre à jour la liste locale immédiatement
-      const updatedAdminFormulaires = adminFormulaires.map((a: any) => 
-        a.id === id ? { ...a, statut: 'REJETE' as const } : a
-      );
-      setAdminFormulaires(updatedAdminFormulaires);
+      // Mettre à jour la liste locale - les formulaires d'admin sont maintenant dans la liste principale
+      // Pas besoin de mise à jour séparée
       
       Alert.alert('Succès', 'Le formulaire d\'administrateur a été rejeté', [
         {
@@ -504,7 +486,7 @@ export default function AdhesionsScreen() {
             setShowRejectionModal(false);
             setRejectionReason('');
             setSelectedReason('');
-            loadAdminFormulaires(); // Recharger la liste depuis l'API
+            // Recharger la liste depuis l'API
           }
         }
       ]);
@@ -515,44 +497,6 @@ export default function AdhesionsScreen() {
     }
   };
 
-  // Filtrer les formulaires d'administrateurs selon le terme de recherche
-  const getFilteredAdminFormulaires = (status: 'EN_ATTENTE' | 'APPROUVE' | 'REJETE') => {
-    try {
-      if (!Array.isArray(adminFormulaires)) {
-        return [];
-      }
-      
-      let filteredByStatus = adminFormulaires.filter((a: any) => {
-        if (!a || typeof a !== 'object') return false;
-        
-        // Si pas de champ statut, considérer comme EN_ATTENTE
-        const formulaireStatus = a.statut || 'EN_ATTENTE';
-        return formulaireStatus === status;
-      });
-            
-      if (!searchTerm || searchTerm.trim() === '') {
-        return filteredByStatus;
-      }
-      
-      const searchLower = searchTerm.toLowerCase().trim();
-      const searchResults = filteredByStatus.filter((formulaire: any) => {
-        if (!formulaire || typeof formulaire !== 'object') return false;
-        
-        const nomComplet = formulaire.utilisateur?.nom_complet || '';
-        const nomUtilisateur = formulaire.utilisateur?.nom_utilisateur || '';
-        
-        return (
-          nomComplet.toLowerCase().includes(searchLower) ||
-          nomUtilisateur.toLowerCase().includes(searchLower)
-        );
-      });
-      
-      return searchResults;
-    } catch (error) {
-      console.error('❌ Erreur lors du filtrage des formulaires d\'administrateurs:', error);
-      return [];
-    }
-  };
 
   // Filtrer les adhésions selon le terme de recherche
   const getFilteredAdhesions = (status: 'EN_ATTENTE' | 'APPROUVE' | 'REJETE') => {
@@ -577,10 +521,35 @@ export default function AdhesionsScreen() {
       const searchResults = filteredByStatus.filter((adhesion: any) => {
         if (!adhesion || typeof adhesion !== 'object') return false;
         
-        // Rechercher dans nom_complet, email, et téléphone avec validation
-        const nomComplet = adhesion.nom_complet || '';
-        const email = adhesion.email || '';
-        const telephone = adhesion.telephone || '';
+        // Gérer les différents formats de nom selon le type de formulaire
+        const getSearchableName = () => {
+          // Pour les formulaires normaux
+          if (adhesion.nom_complet) {
+            return adhesion.nom_complet;
+          }
+          
+          // Pour les formulaires d'administrateur
+          if (adhesion.utilisateur?.nom_complet) {
+            return adhesion.utilisateur.nom_complet;
+          }
+          
+          // Fallback : combiner prénoms + nom
+          if (adhesion.prenoms && adhesion.nom) {
+            return `${adhesion.prenoms} ${adhesion.nom}`;
+          }
+          
+          // Fallback : utilisateur avec prénoms + nom
+          if (adhesion.utilisateur?.prenoms && adhesion.utilisateur?.nom) {
+            return `${adhesion.utilisateur.prenoms} ${adhesion.utilisateur.nom}`;
+          }
+          
+          return '';
+        };
+        
+        // Rechercher dans nom, email, et téléphone avec validation
+        const nomComplet = getSearchableName();
+        const email = adhesion.email || adhesion.utilisateur?.email || '';
+        const telephone = adhesion.telephone || adhesion.utilisateur?.telephone || '';
         
         return (
           nomComplet.toLowerCase().includes(searchLower) ||
@@ -1149,13 +1118,38 @@ export default function AdhesionsScreen() {
     );
   }
 
-  const renderAdhesionItem = ({ item }: { item: AdhesionForm }) => {
+  const renderAdhesionItem = ({ item }: { item: any }) => {
     const showActions = tabValue === 0 && user?.role === 'SECRETAIRE_GENERALE';
+    
+    // Gérer les différents formats de nom selon le type de formulaire
+    const getDisplayName = () => {
+      // Pour les formulaires normaux
+      if (item.nom_complet) {
+        return item.nom_complet;
+      }
+      
+      // Pour les formulaires d'administrateur
+      if (item.utilisateur?.nom_complet) {
+        return item.utilisateur.nom_complet;
+      }
+      
+      // Fallback : combiner prénoms + nom
+      if (item.prenoms && item.nom) {
+        return `${item.prenoms} ${item.nom}`;
+      }
+      
+      // Fallback : utilisateur avec prénoms + nom
+      if (item.utilisateur?.prenoms && item.utilisateur?.nom) {
+        return `${item.utilisateur.prenoms} ${item.utilisateur.nom}`;
+      }
+      
+      return 'Nom non disponible';
+    };
     
     return (
       <View style={styles.adhesionCard}>
         <View style={styles.adhesionHeader}>
-          <Text style={styles.adhesionName}>{item.nom_complet}</Text>
+          <Text style={styles.adhesionName}>{getDisplayName()}</Text>
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.statut) }]}>
             <Text style={styles.statusText}>{getStatusLabel(item.statut)}</Text>
           </View>
@@ -1238,7 +1232,7 @@ export default function AdhesionsScreen() {
       <View style={styles.content}>        
         {/* Titre */}
         <Text style={styles.title}>
-          {showAdminFormulaires ? 'Formulaires d\'Administrateurs' : 'Gestion des Adhésions'}
+          Gestion des Adhésions
         </Text>
 
         {/* Barre de recherche */}
@@ -1252,174 +1246,57 @@ export default function AdhesionsScreen() {
           />
         </View>
 
-        {/* Bouton pour les formulaires d'administrateurs (visible seulement pour SECRETAIRE_GENERALE) */}
-        {user?.role === 'SECRETAIRE_GENERALE' && (
+
+
+        {/* Onglets */}
+        <View style={styles.tabsContainer}>
           <TouchableOpacity
-            style={styles.adminFormulairesButton}
-            onPress={() => {
-              setShowAdminFormulaires(!showAdminFormulaires);
-              if (!showAdminFormulaires) {
-                loadAdminFormulaires();
-              }
-            }}
+            style={[styles.tab, tabValue === 0 && styles.activeTab]}
+            onPress={() => setTabValue(0)}
           >
-            <Ionicons 
-              name={showAdminFormulaires ? "chevron-up" : "chevron-down"} 
-              size={20} 
-              color="#007AFF" 
-            />
-            <Text style={styles.adminFormulairesButtonText}>
-              {showAdminFormulaires ? 'Masquer' : 'Afficher'} les formulaires d'administrateurs
+            <Text style={[styles.tabText, tabValue === 0 && styles.activeTabText]}>
+              En attente ({getTabCount('EN_ATTENTE')})
             </Text>
           </TouchableOpacity>
-        )}
+          
+          <TouchableOpacity
+            style={[styles.tab, tabValue === 1 && styles.activeTab]}
+            onPress={() => setTabValue(1)}
+          >
+            <Text style={[styles.tabText, tabValue === 1 && styles.activeTabText]}>
+              Validées ({getTabCount('APPROUVE')})
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.tab, tabValue === 2 && styles.activeTab]}
+            onPress={() => setTabValue(2)}
+          >
+            <Text style={[styles.tabText, tabValue === 2 && styles.activeTabText]}>
+              Rejetées ({getTabCount('REJETE')})
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-
-        {/* Onglets - Affichage conditionnel selon le mode */}
-        {showAdminFormulaires ? (
-          <>
-            <View style={styles.tabsContainer}>
-              <TouchableOpacity
-                style={[styles.tab, adminTabValue === 0 && styles.activeTab]}
-                onPress={() => setAdminTabValue(0)}
-              >
-                <Text style={[styles.tabText, adminTabValue === 0 && styles.activeTabText]}>
-                  En attente ({getAdminTabCount('EN_ATTENTE')})
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[styles.tab, adminTabValue === 1 && styles.activeTab]}
-                onPress={() => setAdminTabValue(1)}
-              >
-                <Text style={[styles.tabText, adminTabValue === 1 && styles.activeTabText]}>
-                  Validés ({getAdminTabCount('APPROUVE')})
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[styles.tab, adminTabValue === 2 && styles.activeTab]}
-                onPress={() => setAdminTabValue(2)}
-              >
-                <Text style={[styles.tabText, adminTabValue === 2 && styles.activeTabText]}>
-                  Rejetés ({getAdminTabCount('REJETE')})
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </>
-        ) : (
-          <View style={styles.tabsContainer}>
-            <TouchableOpacity
-              style={[styles.tab, tabValue === 0 && styles.activeTab]}
-              onPress={() => setTabValue(0)}
-            >
-              <Text style={[styles.tabText, tabValue === 0 && styles.activeTabText]}>
-                En attente ({getTabCount('EN_ATTENTE')})
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[styles.tab, tabValue === 1 && styles.activeTab]}
-              onPress={() => setTabValue(1)}
-            >
-              <Text style={[styles.tabText, tabValue === 1 && styles.activeTabText]}>
-                Validées ({getTabCount('APPROUVE')})
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[styles.tab, tabValue === 2 && styles.activeTab]}
-              onPress={() => setTabValue(2)}
-            >
-              <Text style={[styles.tabText, tabValue === 2 && styles.activeTabText]}>
-                Rejetées ({getTabCount('REJETE')})
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Contenu des onglets - Affichage conditionnel selon le mode */}
+        {/* Contenu des onglets */}
         <View style={styles.tabContent}>
-          {showAdminFormulaires ? (
-            <>
-              {adminTabValue === 0 && (
+          {tabValue === 0 && (
                 <>
-                  {!loadingAdminFormulaires && getFilteredAdminFormulaires('EN_ATTENTE').length === 0 ? (
+                  {!loading && getFilteredAdhesions('EN_ATTENTE').length === 0 ? (
                     <View style={styles.emptyContainer}>
                       <Ionicons name="document-outline" size={64} color="#8E8E93" />
-                      <Text style={styles.emptyTitle}>Aucun formulaire d'administrateur en attente</Text>
+                      <Text style={styles.emptyTitle}>Aucune adhésion en attente</Text>
                       <Text style={styles.emptyText}>
-                        Il n'y a actuellement aucun formulaire d'administrateur en attente de validation.
+                        Il n'y a actuellement aucune adhésion en attente de validation.
                       </Text>
                     </View>
                   ) : (
                     <FlatList
-                      data={getFilteredAdminFormulaires('EN_ATTENTE')}
+                      data={getFilteredAdhesions('EN_ATTENTE')}
                       refreshControl={
                         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                       }
-                      renderItem={({ item }) => (
-                        <View style={styles.adhesionCard}>
-                          <View style={styles.adhesionHeader}>
-                            <Text style={styles.adhesionName}>{item.utilisateur?.nom_complet}</Text>
-                            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.statut || 'EN_ATTENTE') }]}>
-                              <Text style={styles.statusText}>{getStatusLabel(item.statut || 'EN_ATTENTE')}</Text>
-                            </View>
-                          </View>
-                          
-                          <View style={styles.adhesionDetails}>
-                            <Text style={styles.dateText}>
-                              {formatDate(item.date_soumission)}
-                            </Text>
-                            <Text style={styles.timeText}>
-                              {formatTime(item.date_soumission)}
-                            </Text>
-                            <Text style={styles.adminRoleText}>
-                              Rôle: {item.utilisateur?.role}
-                            </Text>
-                          </View>
-                          
-                          <View style={styles.adhesionActions}>
-                            <TouchableOpacity
-                              style={styles.actionButton}
-                              onPress={() => {
-                                router.push(`/adhesion/${item.id}`);
-                              }}
-                            >
-                              <Ionicons name="eye-outline" size={20} color="#007AFF" />
-                              <Text style={styles.actionButtonText}>Voir</Text>
-                            </TouchableOpacity>
-                            
-                            {item.statut === 'EN_ATTENTE' && (
-                              <>
-                                <TouchableOpacity
-                                  style={[styles.actionButton, styles.validateButton]}
-                                  onPress={() => {
-                                    setSelectedAdhesion(item);
-                                    setIsAdminFormulaireContext(true);
-                                    setShowValidationModal(true);
-                                  }}
-                                >
-                                  <Ionicons name="checkmark-circle-outline" size={20} color="white" />
-                                  <Text style={[styles.actionButtonText, styles.validateButtonText]}>Valider</Text>
-                                </TouchableOpacity>
-                                
-                                <TouchableOpacity
-                                  style={[styles.actionButton, styles.rejectButton]}
-                                  onPress={() => {
-                                    setSelectedAdhesion(item);
-                                    setIsAdminFormulaireContext(true);
-                                    setShowRejectionModal(true);
-                                  }}
-                                >
-                                  <Ionicons name="close-circle-outline" size={20} color="white" />
-                                  <Text style={[styles.actionButtonText, styles.rejectButtonText]}>Rejeter</Text>
-                                </TouchableOpacity>
-                              </>
-                            )}
-                          </View>
-                        </View>
-                      )}
+                      renderItem={renderAdhesionItem}
                       keyExtractor={(item) => item.id.toString()}
                       showsVerticalScrollIndicator={false}
                       contentContainerStyle={styles.listContainer}
@@ -1427,208 +1304,56 @@ export default function AdhesionsScreen() {
                   )}
                 </>
               )}
-
-              {adminTabValue === 1 && (
-                <>
-                  {!loadingAdminFormulaires && getFilteredAdminFormulaires('APPROUVE').length === 0 ? (
-                    <View style={styles.emptyContainer}>
-                      <Ionicons name="checkmark-circle-outline" size={64} color="#34C759" />
-                      <Text style={styles.emptyTitle}>Aucun formulaire d'administrateur validé</Text>
-                      <Text style={styles.emptyText}>
-                        Il n'y a actuellement aucun formulaire d'administrateur validé.
-                      </Text>
-                    </View>
-                  ) : (
-                    <FlatList
-                      data={getFilteredAdminFormulaires('APPROUVE')}
-                      refreshControl={
-                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-                      }
-                      renderItem={({ item }) => (
-                        <View style={styles.adhesionCard}>
-                          <View style={styles.adhesionHeader}>
-                            <Text style={styles.adhesionName}>{item.utilisateur?.nom_complet}</Text>
-                            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.statut || 'APPROUVE') }]}>
-                              <Text style={styles.statusText}>{getStatusLabel(item.statut || 'APPROUVE')}</Text>
-                            </View>
-                          </View>
-                          
-                          <View style={styles.adhesionDetails}>
-                            <Text style={styles.dateText}>
-                              {formatDate(item.date_soumission)}
-                            </Text>
-                            <Text style={styles.timeText}>
-                              {formatTime(item.date_soumission)}
-                            </Text>
-                            <Text style={styles.adminRoleText}>
-                              Rôle: {item.utilisateur?.role}
-                            </Text>
-                          </View>
-                          
-                          <View style={styles.adhesionActions}>
-                            <TouchableOpacity
-                              style={styles.actionButton}
-                              onPress={() => {
-                                router.push(`/adhesion/${item.id}`);
-                              }}
-                            >
-                              <Ionicons name="eye-outline" size={20} color="#007AFF" />
-                              <Text style={styles.actionButtonText}>Voir</Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      )}
-                      keyExtractor={(item) => item.id.toString()}
-                      showsVerticalScrollIndicator={false}
-                      contentContainerStyle={styles.listContainer}
-                    />
-                  )}
-                </>
-              )}
-
-              {adminTabValue === 2 && (
-                <>
-                  {!loadingAdminFormulaires && getFilteredAdminFormulaires('REJETE').length === 0 ? (
-                    <View style={styles.emptyContainer}>
-                      <Ionicons name="close-circle-outline" size={64} color="#FF3B30" />
-                      <Text style={styles.emptyTitle}>Aucun formulaire d'administrateur rejeté</Text>
-                      <Text style={styles.emptyText}>
-                        Il n'y a actuellement aucun formulaire d'administrateur rejeté.
-                      </Text>
-                    </View>
-                  ) : (
-                    <FlatList
-                      data={getFilteredAdminFormulaires('REJETE')}
-                      refreshControl={
-                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-                      }
-                      renderItem={({ item }) => (
-                        <View style={styles.adhesionCard}>
-                          <View style={styles.adhesionHeader}>
-                            <Text style={styles.adhesionName}>{item.utilisateur?.nom_complet}</Text>
-                            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.statut || 'REJETE') }]}>
-                              <Text style={styles.statusText}>{getStatusLabel(item.statut || 'REJETE')}</Text>
-                            </View>
-                          </View>
-                          
-                          <View style={styles.adhesionDetails}>
-                            <Text style={styles.dateText}>
-                              {formatDate(item.date_soumission)}
-                            </Text>
-                            <Text style={styles.timeText}>
-                              {formatTime(item.date_soumission)}
-                            </Text>
-                            <Text style={styles.adminRoleText}>
-                              Rôle: {item.utilisateur?.role}
-                            </Text>
-                          </View>
-                          
-                          {item.raison_rejet && (
-                            <View style={styles.rejectionReason}>
-                              <Text style={styles.rejectionLabel}>Raison du rejet :</Text>
-                              <Text style={styles.rejectionText}>{item.raison_rejet}</Text>
-                            </View>
-                          )}
-                          
-                          <View style={styles.adhesionActions}>
-                            <TouchableOpacity
-                              style={styles.actionButton}
-                              onPress={() => {
-                                router.push(`/adhesion/${item.id}`);
-                              }}
-                            >
-                              <Ionicons name="eye-outline" size={20} color="#007AFF" />
-                              <Text style={styles.actionButtonText}>Voir</Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      )}
-                      keyExtractor={(item) => item.id.toString()}
-                      showsVerticalScrollIndicator={false}
-                      contentContainerStyle={styles.listContainer}
-                    />
-                  )}
-                </>
-              )}
-            </>
-          ) : (
-            <>
-              {tabValue === 0 && (
-            <>
-              {!loading && getFilteredAdhesions('EN_ATTENTE').length === 0 ? (
-                <View style={styles.emptyContainer}>
-                  <Ionicons name="document-outline" size={64} color="#8E8E93" />
-                  <Text style={styles.emptyTitle}>Aucune adhésion en attente</Text>
-                  <Text style={styles.emptyText}>
-                    Il n'y a actuellement aucune adhésion en attente de validation.
-                  </Text>
-                </View>
-              ) : (
-                <FlatList
-                  data={getFilteredAdhesions('EN_ATTENTE')}
-                  refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-                  }
-                  renderItem={renderAdhesionItem}
-                  keyExtractor={(item) => item.id.toString()}
-                  showsVerticalScrollIndicator={false}
-                  contentContainerStyle={styles.listContainer}
-                />
-              )}
-            </>
-          )}
 
           {tabValue === 1 && (
-            <>
-              {!loading && getFilteredAdhesions('APPROUVE').length === 0 ? (
-                <View style={styles.emptyContainer}>
-                  <Ionicons name="checkmark-circle-outline" size={64} color="#34C759" />
-                  <Text style={styles.emptyTitle}>Aucune adhésion validée</Text>
-                  <Text style={styles.emptyText}>
-                    Il n'y a actuellement aucune adhésion validée.
-                  </Text>
-                </View>
-              ) : (
-                <FlatList
-                  data={getFilteredAdhesions('APPROUVE')}
-                  refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-                  }
-                  renderItem={renderAdhesionItem}
-                  keyExtractor={(item) => item.id.toString()}
-                  showsVerticalScrollIndicator={false}
-                  contentContainerStyle={styles.listContainer}
-                />
+                <>
+                  {!loading && getFilteredAdhesions('APPROUVE').length === 0 ? (
+                    <View style={styles.emptyContainer}>
+                      <Ionicons name="checkmark-circle-outline" size={64} color="#34C759" />
+                      <Text style={styles.emptyTitle}>Aucune adhésion validée</Text>
+                      <Text style={styles.emptyText}>
+                        Il n'y a actuellement aucune adhésion validée.
+                      </Text>
+                    </View>
+                  ) : (
+                    <FlatList
+                      data={getFilteredAdhesions('APPROUVE')}
+                      refreshControl={
+                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                      }
+                      renderItem={renderAdhesionItem}
+                      keyExtractor={(item) => item.id.toString()}
+                      showsVerticalScrollIndicator={false}
+                      contentContainerStyle={styles.listContainer}
+                    />
+                  )}
+                </>
               )}
-            </>
-          )}
 
           {tabValue === 2 && (
-            <>
-              {!loading && getFilteredAdhesions('REJETE').length === 0 ? (
-                <View style={styles.emptyContainer}>
-                  <Ionicons name="close-circle-outline" size={64} color="#FF3B30" />
-                  <Text style={styles.emptyTitle}>Aucune adhésion rejetée</Text>
-                  <Text style={styles.emptyText}>
-                    Il n'y a actuellement aucune adhésion rejetée.
-                  </Text>
-                </View>
-              ) : (
-                <FlatList
-                  data={getFilteredAdhesions('REJETE')}
-                  refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-                  }
-                  renderItem={renderAdhesionItem}
-                  keyExtractor={(item) => item.id.toString()}
-                  showsVerticalScrollIndicator={false}
-                  contentContainerStyle={styles.listContainer}
-                />
+                <>
+                  {!loading && getFilteredAdhesions('REJETE').length === 0 ? (
+                    <View style={styles.emptyContainer}>
+                      <Ionicons name="close-circle-outline" size={64} color="#FF3B30" />
+                      <Text style={styles.emptyTitle}>Aucune adhésion rejetée</Text>
+                      <Text style={styles.emptyText}>
+                        Il n'y a actuellement aucune adhésion rejetée.
+                      </Text>
+                    </View>
+                  ) : (
+                    <FlatList
+                      data={getFilteredAdhesions('REJETE')}
+                      refreshControl={
+                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                      }
+                      renderItem={renderAdhesionItem}
+                      keyExtractor={(item) => item.id.toString()}
+                      showsVerticalScrollIndicator={false}
+                      contentContainerStyle={styles.listContainer}
+                    />
+                  )}
+                </>
               )}
-            </>
-          )}
-            </>
-          )}
         </View>
       </View>
 

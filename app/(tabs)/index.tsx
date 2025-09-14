@@ -6,18 +6,18 @@ import { router } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    Image,
-    Modal,
-    RefreshControl,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Image,
+  Modal,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import ImageViewer from '../../components/ui/ImageViewer';
 import { useAuth } from '../../hooks/useAuth';
@@ -80,11 +80,42 @@ export default function DashboardScreen() {
         // Récupérer les statistiques du tableau de bord via l'API
         const dashboardData = await apiService.getSecretaryDashboard();
         
+        // Récupérer les formulaires d'administrateur
+        let adminStats = {
+          totalAdminMembers: 0,
+          pendingAdminAdhesions: 0,
+          validatedAdminAdhesions: 0,
+          rejectedAdminAdhesions: 0,
+        };
+        
+        try {
+          const adminFormulaires = await apiService.getSecretaryAdminFormulaires();
+          if (adminFormulaires?.donnees?.formulaires) {
+            adminStats = {
+              totalAdminMembers: adminFormulaires.donnees.formulaires.filter((form: any) => 
+                form.statut === 'APPROUVE' || form.statut_formulaire?.statut === 'APPROUVE'
+              ).length,
+              pendingAdminAdhesions: adminFormulaires.donnees.formulaires.filter((form: any) => 
+                form.statut === 'EN_ATTENTE' || form.statut_formulaire?.statut === 'EN_ATTENTE'
+              ).length,
+              validatedAdminAdhesions: adminFormulaires.donnees.formulaires.filter((form: any) => 
+                form.statut === 'APPROUVE' || form.statut_formulaire?.statut === 'APPROUVE'
+              ).length,
+              rejectedAdminAdhesions: adminFormulaires.donnees.formulaires.filter((form: any) => 
+                form.statut === 'REJETE' || form.statut_formulaire?.statut === 'REJETE'
+              ).length,
+            };
+          }
+        } catch (adminError) {
+          console.log('Pas de formulaires d\'administrateur trouvés ou erreur:', adminError);
+        }
+        
+        // Additionner les statistiques normales avec les formulaires d'administrateur
         setStats({
-          totalMembers: dashboardData.donnees.statistiques.membres_approuves,
-          pendingAdhesions: dashboardData.donnees.statistiques.membres_en_attente,
-          validatedAdhesions: dashboardData.donnees.statistiques.membres_approuves,
-          rejectedAdhesions: dashboardData.donnees.statistiques.membres_rejetes,
+          totalMembers: dashboardData.donnees.statistiques.membres_approuves + adminStats.totalAdminMembers,
+          pendingAdhesions: dashboardData.donnees.statistiques.membres_en_attente + adminStats.pendingAdminAdhesions,
+          validatedAdhesions: dashboardData.donnees.statistiques.membres_approuves + adminStats.validatedAdminAdhesions,
+          rejectedAdhesions: dashboardData.donnees.statistiques.membres_rejetes + adminStats.rejectedAdminAdhesions,
         });
       } catch (error) {
         console.error('Erreur lors du chargement des statistiques:', error);
@@ -129,14 +160,45 @@ export default function DashboardScreen() {
       const dashboardData = await apiService.getSecretaryDashboard();
       console.log('Dashboard data (refresh):', dashboardData);
       
+      // Récupérer les formulaires d'administrateur
+      let adminStats = {
+        totalAdminMembers: 0,
+        pendingAdminAdhesions: 0,
+        validatedAdminAdhesions: 0,
+        rejectedAdminAdhesions: 0,
+      };
+      
+      try {
+        const adminFormulaires = await apiService.getSecretaryAdminFormulaires();
+        if (adminFormulaires?.donnees?.formulaires) {
+          adminStats = {
+            totalAdminMembers: adminFormulaires.donnees.formulaires.filter((form: any) => 
+              form.statut === 'APPROUVE' || form.statut_formulaire?.statut === 'APPROUVE'
+            ).length,
+            pendingAdminAdhesions: adminFormulaires.donnees.formulaires.filter((form: any) => 
+              form.statut === 'EN_ATTENTE' || form.statut_formulaire?.statut === 'EN_ATTENTE'
+            ).length,
+            validatedAdminAdhesions: adminFormulaires.donnees.formulaires.filter((form: any) => 
+              form.statut === 'APPROUVE' || form.statut_formulaire?.statut === 'APPROUVE'
+            ).length,
+            rejectedAdminAdhesions: adminFormulaires.donnees.formulaires.filter((form: any) => 
+              form.statut === 'REJETE' || form.statut_formulaire?.statut === 'REJETE'
+            ).length,
+          };
+        }
+      } catch (adminError) {
+        console.log('Pas de formulaires d\'administrateur trouvés ou erreur:', adminError);
+      }
+      
+      // Additionner les statistiques normales avec les formulaires d'administrateur
       setStats({
-        totalMembers: dashboardData.donnees.statistiques.membres_approuves,
-        pendingAdhesions: dashboardData.donnees.statistiques.membres_en_attente,
-        validatedAdhesions: dashboardData.donnees.statistiques.membres_approuves,
-        rejectedAdhesions: dashboardData.donnees.statistiques.membres_rejetes,
+        totalMembers: dashboardData.donnees.statistiques.membres_approuves + adminStats.totalAdminMembers,
+        pendingAdhesions: dashboardData.donnees.statistiques.membres_en_attente + adminStats.pendingAdminAdhesions,
+        validatedAdhesions: dashboardData.donnees.statistiques.membres_approuves + adminStats.validatedAdminAdhesions,
+        rejectedAdhesions: dashboardData.donnees.statistiques.membres_rejetes + adminStats.rejectedAdminAdhesions,
       });
       
-      console.log('📋 Statistiques rechargées avec succès');
+      console.log('📋 Statistiques rechargées avec succès (incluant formulaires admin)');
     } catch (error) {
       console.error('Erreur lors du rafraîchissement des statistiques:', error);
       setError('Erreur lors du rafraîchissement des statistiques');

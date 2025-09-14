@@ -29,6 +29,7 @@ interface AdhesionFormMember {
   statut: 'EN_ATTENTE' | 'APPROUVE' | 'REJETE';
   code_formulaire: string;
   numero_adhesion?: string;
+  adresse?: string;
   soumis_le: string;
   raison_rejet: string | null;
   rejete_le: string | null;
@@ -117,22 +118,84 @@ export default function MembresScreen() {
             }
           }
           
+          // Récupérer les formulaires d'administrateur
+          let adminFormulaires: any[] = [];
+          try {
+            const adminData = await apiService.getSecretaryAdminFormulaires();
+            if (adminData?.donnees?.formulaires) {
+              adminFormulaires = adminData.donnees.formulaires;
+              console.log("📋 Formulaires admin trouvés:", adminFormulaires);
+            }
+          } catch (adminError) {
+            console.log('Pas de formulaires d\'administrateur trouvés:', adminError);
+          }
+          
+          // Combiner les formulaires normaux avec les formulaires d'administrateur
+          const allFormulaires = [...processedData, ...adminFormulaires];
+          
+          // Filtrer pour ne garder que les membres validés (approuvés)
+          const validatedFormulaires = allFormulaires.filter((form: any) => {
+            const statut = form.statut || form.statut_formulaire?.statut || 'EN_ATTENTE';
+            return statut === 'APPROUVE';
+          });
+          
+          console.log(`✅ ${allFormulaires.length} formulaires total, ${validatedFormulaires.length} membres validés affichés`);
+          
+          // Log détaillé pour les premiers membres administrateur
+          if (validatedFormulaires.length > 0) {
+            console.log("🔍 Premier membre validé:", validatedFormulaires[0]);
+            console.log("📊 Champs disponibles:", Object.keys(validatedFormulaires[0]));
+            if (validatedFormulaires[0].utilisateur) {
+              console.log("👤 Champs utilisateur:", Object.keys(validatedFormulaires[0].utilisateur));
+            }
+          }
+          
           // Convertir vers notre interface
-          const convertedMembers: AdhesionFormMember[] = processedData.map((apiMember: any) => ({
+          const convertedMembers: AdhesionFormMember[] = validatedFormulaires.map((apiMember: any) => ({
             id: apiMember.id,
-            nom_complet: apiMember.nom_complet || 'Nom non disponible',
-            email: apiMember.email,
-            telephone: apiMember.telephone || '',
-            statut: apiMember.statut || 'EN_ATTENTE',
-            code_formulaire: apiMember.code_formulaire || '',
-            numero_adhesion: '',
-            soumis_le: apiMember.soumis_le || '',
+            nom_complet: apiMember.nom_complet || 
+                        apiMember.utilisateur?.nom_complet || 
+                        (apiMember.prenoms && apiMember.nom ? `${apiMember.prenoms} ${apiMember.nom}` : '') ||
+                        (apiMember.utilisateur?.prenoms && apiMember.utilisateur?.nom ? `${apiMember.utilisateur.prenoms} ${apiMember.utilisateur.nom}` : '') ||
+                        'Nom non disponible',
+            email: apiMember.email || apiMember.utilisateur?.email || '',
+            telephone: apiMember.telephone || apiMember.utilisateur?.telephone || '',
+            statut: apiMember.statut || apiMember.statut_formulaire?.statut || 'EN_ATTENTE',
+            code_formulaire: apiMember.code_formulaire || apiMember.numero_formulaire || '',
+            numero_adhesion: apiMember.numero_adhesion || 
+                           apiMember.numero_membre || 
+                           apiMember.utilisateur?.numero_adhesion ||
+                           apiMember.formulaire_actuel?.numero_adhesion ||
+                           apiMember.membre?.numero_adhesion ||
+                           apiMember.adherent?.numero_adhesion ||
+                           apiMember.numero_adherent ||
+                           apiMember.id_utilisateur ||
+                           '',
+            adresse: apiMember.adresse || 
+                    apiMember.utilisateur?.adresse ||
+                    apiMember.formulaire_actuel?.adresse ||
+                    apiMember.membre?.adresse ||
+                    apiMember.adherent?.adresse ||
+                    apiMember.donnees_snapshot?.adresse ||
+                    (apiMember.ville && apiMember.pays ? `${apiMember.ville}, ${apiMember.pays}` : '') ||
+                    (apiMember.utilisateur?.ville && apiMember.utilisateur?.pays ? `${apiMember.utilisateur.ville}, ${apiMember.utilisateur.pays}` : '') ||
+                    (apiMember.adresse_complete || apiMember.adresse_complète) ||
+                    (apiMember.localisation || apiMember.location) ||
+                    '',
+            soumis_le: apiMember.soumis_le || apiMember.date_soumission || apiMember.created_at || '',
             raison_rejet: apiMember.raison_rejet,
             rejete_le: apiMember.rejete_le,
             rejete_par: apiMember.rejete_par,
-            est_actif: apiMember.est_actif !== undefined ? apiMember.est_actif : apiMember.statut === 'APPROUVE',
+            est_actif: apiMember.est_actif !== undefined ? apiMember.est_actif : (apiMember.statut === 'APPROUVE' || apiMember.statut_formulaire?.statut === 'APPROUVE'),
             formulaire_actuel: apiMember.formulaire_actuel
           }));
+          
+          console.log("✅ Membres convertis:", convertedMembers.length);
+          if (convertedMembers.length > 0) {
+            console.log("📋 Premier membre:", convertedMembers[0]);
+            console.log("🔢 Numéro adhérent mappé:", convertedMembers[0].numero_adhesion);
+            console.log("🏠 Adresse mappée:", convertedMembers[0].adresse);
+          }
           setMembers(convertedMembers);
         } else {
           // Pour les membres, charger le répertoire des membres
@@ -234,22 +297,66 @@ export default function MembresScreen() {
           }
         }
         
+        // Récupérer les formulaires d'administrateur
+        let adminFormulaires: any[] = [];
+        try {
+          const adminData = await apiService.getSecretaryAdminFormulaires();
+          if (adminData?.donnees?.formulaires) {
+            adminFormulaires = adminData.donnees.formulaires;
+            console.log("📋 Formulaires admin trouvés (refresh):", adminFormulaires.length);
+          }
+        } catch (adminError) {
+          console.log('Pas de formulaires d\'administrateur trouvés (refresh):', adminError);
+        }
+        
+        // Combiner les formulaires normaux avec les formulaires d'administrateur
+        const allFormulaires = [...processedData, ...adminFormulaires];
+        
+        // Filtrer pour ne garder que les membres validés (approuvés)
+        const validatedFormulaires = allFormulaires.filter((form: any) => {
+          const statut = form.statut || form.statut_formulaire?.statut || 'EN_ATTENTE';
+          return statut === 'APPROUVE';
+        });
+        
         // Convertir vers notre interface
-        const convertedMembers: AdhesionFormMember[] = processedData.map((apiMember: any) => ({
+        const convertedMembers: AdhesionFormMember[] = validatedFormulaires.map((apiMember: any) => ({
           id: apiMember.id,
-          nom_complet: apiMember.nom_complet || 'Nom non disponible',
-          email: apiMember.email,
-          telephone: apiMember.telephone || '',
-          statut: apiMember.statut || 'EN_ATTENTE',
-          code_formulaire: apiMember.code_formulaire || '',
-          numero_adhesion: apiMember.numero_adhesion || '',
-          soumis_le: apiMember.soumis_le || '',
+          nom_complet: apiMember.nom_complet || 
+                      apiMember.utilisateur?.nom_complet || 
+                      (apiMember.prenoms && apiMember.nom ? `${apiMember.prenoms} ${apiMember.nom}` : '') ||
+                      (apiMember.utilisateur?.prenoms && apiMember.utilisateur?.nom ? `${apiMember.utilisateur.prenoms} ${apiMember.utilisateur.nom}` : '') ||
+                      'Nom non disponible',
+          email: apiMember.email || apiMember.utilisateur?.email || '',
+          telephone: apiMember.telephone || apiMember.utilisateur?.telephone || '',
+          statut: apiMember.statut || apiMember.statut_formulaire?.statut || 'EN_ATTENTE',
+          code_formulaire: apiMember.code_formulaire || apiMember.numero_formulaire || '',
+          numero_adhesion: apiMember.numero_adhesion || 
+                         apiMember.numero_membre || 
+                         apiMember.utilisateur?.numero_adhesion ||
+                         apiMember.formulaire_actuel?.numero_adhesion ||
+                         apiMember.membre?.numero_adhesion ||
+                         apiMember.adherent?.numero_adhesion ||
+                         apiMember.numero_adherent ||
+                         apiMember.id_utilisateur ||
+                         '',
+          adresse: apiMember.adresse || 
+                  apiMember.utilisateur?.adresse ||
+                  apiMember.formulaire_actuel?.adresse ||
+                  apiMember.membre?.adresse ||
+                  apiMember.adherent?.adresse ||
+                  apiMember.donnees_snapshot?.adresse ||
+                  (apiMember.ville && apiMember.pays ? `${apiMember.ville}, ${apiMember.pays}` : '') ||
+                  (apiMember.utilisateur?.ville && apiMember.utilisateur?.pays ? `${apiMember.utilisateur.ville}, ${apiMember.utilisateur.pays}` : '') ||
+                  (apiMember.adresse_complete || apiMember.adresse_complète) ||
+                  (apiMember.localisation || apiMember.location) ||
+                  '',
+          soumis_le: apiMember.soumis_le || apiMember.date_soumission || apiMember.created_at || '',
           raison_rejet: apiMember.raison_rejet || null,
           rejete_le: apiMember.rejete_le || null,
           rejete_par: apiMember.rejete_par || null,
           approuve_le: apiMember.approuve_le || null,
           approuve_par: apiMember.approuve_par || null,
-          est_actif: apiMember.statut === 'APPROUVE',
+          est_actif: apiMember.statut === 'APPROUVE' || apiMember.statut_formulaire?.statut === 'APPROUVE',
           formulaire_actuel: apiMember.formulaire_actuel || null
         }));
         
@@ -467,7 +574,7 @@ export default function MembresScreen() {
         <View style={styles.memberDetails}>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>N° d'Adhérant:</Text>
-            <Text style={styles.detailValue}>{item.code_formulaire || item.numero_adhesion || 'N/A'}</Text>
+            <Text style={styles.detailValue}>{item.numero_adhesion || 'N/A'}</Text>
           </View>
           
           <View style={styles.detailRow}>
@@ -487,7 +594,7 @@ export default function MembresScreen() {
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Adresse:</Text>
             <Text style={styles.detailValue}>
-              {item.formulaire_actuel?.donnees_snapshot?.adresse || 'N/A'}
+              {item.adresse || item.formulaire_actuel?.donnees_snapshot?.adresse || 'N/A'}
             </Text>
           </View>
           

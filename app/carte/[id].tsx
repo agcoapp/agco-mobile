@@ -95,23 +95,87 @@ export default function CarteMembreScreen() {
         
         // Récupérer les données du membre depuis l'API des adhésions
         const adhesionResponse = await apiService.getAdhesionForms();
-        const foundMember = adhesionResponse.donnees?.formulaires?.find((adhesion: any) => 
+        let foundMember = adhesionResponse.donnees?.formulaires?.find((adhesion: any) => 
           adhesion.id === parseInt(id) && adhesion.statut === 'APPROUVE'
         );
+        
+        // Si pas trouvé dans les adhésions normales, chercher dans les formulaires d'administrateur
+        if (!foundMember) {
+          try {
+            const adminResponse = await apiService.getSecretaryAdminFormulaires();
+            foundMember = adminResponse.donnees?.formulaires?.find((adminForm: any) => 
+              adminForm.id === parseInt(id) && adminForm.statut === 'APPROUVE'
+            );
+            console.log("🔍 Recherche dans les formulaires admin pour ID:", id);
+            if (foundMember) {
+              console.log("✅ Membre administrateur trouvé:", foundMember);
+            }
+          } catch (adminError) {
+            console.log("Erreur lors de la recherche dans les formulaires admin:", adminError);
+          }
+        }
         
         if (foundMember) {
           setMember(foundMember);
           
           // Récupérer les cartes de membres depuis l'API
           const cardsResponse = await apiService.getMemberCards();
-          const foundCard = cardsResponse.cartes?.find((card: any) => 
-            card.id === parseInt(id)
+          console.log("📋 Réponse cartes:", cardsResponse);
+          console.log("📋 Cartes disponibles:", cardsResponse.cartes?.length || 0);
+          
+          // Pour les membres administrateur, utiliser l'ID utilisateur au lieu de l'ID formulaire
+          const searchId = foundMember.utilisateur?.id || parseInt(id);
+          console.log("🔍 ID de recherche:", searchId, "(utilisateur ID:", foundMember.utilisateur?.id, ", formulaire ID:", id, ")");
+          
+          // Essayer plusieurs méthodes de recherche
+          let foundCard = cardsResponse.cartes?.find((card: any) => 
+            card.id === searchId
           );
+          
+          // Si pas trouvé, essayer avec l'ID original
+          if (!foundCard) {
+            foundCard = cardsResponse.cartes?.find((card: any) => 
+              card.id === parseInt(id)
+            );
+          }
+          
+          // Si pas trouvé, essayer avec string
+          if (!foundCard) {
+            foundCard = cardsResponse.cartes?.find((card: any) => 
+              card.id === id || card.id === String(id)
+            );
+          }
+          
+          // Si pas trouvé, essayer avec comparaison lâche
+          if (!foundCard) {
+            foundCard = cardsResponse.cartes?.find((card: any) => 
+              String(card.id) === String(id) || card.id == id
+            );
+          }
+          
+          console.log("🔍 Carte recherchée pour ID:", id, "(type:", typeof id, ")");
+          console.log("🔍 ID converti:", parseInt(id), "(type:", typeof parseInt(id), ")");
+          console.log("✅ Carte trouvée:", foundCard);
           
           if (foundCard) {
             setMemberCard(foundCard);
           } else {
-            setError('Aucune carte générée pour ce membre');
+            console.log("❌ Aucune carte trouvée pour ce membre");
+            // Pour les membres administrateur, on peut utiliser les données du formulaire pour créer une carte virtuelle
+            if (foundMember.type === 'ADMIN_PERSONNEL') {
+              console.log("🔧 Membre administrateur détecté, création de carte virtuelle");
+              // Créer une carte virtuelle avec les données du membre administrateur
+              const virtualCard = {
+                id: foundMember.id,
+                carte_membre: {
+                  recto_url: foundMember.url_fiche_formulaire || '',
+                  verso_url: foundMember.url_fiche_formulaire || ''
+                }
+              };
+              setMemberCard(virtualCard);
+            } else {
+              setError('Aucune carte générée pour ce membre');
+            }
           }
         } else {
           setError('Membre non trouvé ou adhésion non validée');
