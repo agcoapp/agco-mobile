@@ -59,7 +59,7 @@ const CarteVersoGenerator = forwardRef<CarteVersoGeneratorRef, CarteVersoGenerat
 
     const generateHTML = (memberData: any, qrCodeBase64?: string, signatureUrl?: string) => {
       const versoHTML = `
-        <div style="width: 660px; height: 450px; background: #fefefe; border: 2px solid #ccc; position: relative; margin: 0 auto; box-sizing: border-box;">
+        <div style="width: 660px; height: 450px; border: 2px solid #ccc; position: relative; margin: 0 auto; box-sizing: border-box;">
           <!-- Main Section -->
           <div style="position: absolute; width: 100%; height: 350px; top: 0; left: 0; background: #fefefe; display: flex; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box;">
             <!-- Title -->
@@ -72,18 +72,18 @@ const CarteVersoGenerator = forwardRef<CarteVersoGeneratorRef, CarteVersoGenerat
               ${qrCodeBase64 ? 
                 `<div style="flex: 0 0 auto; width: 140px; height: 140px; position: relative;">
                    <img src="${qrCodeBase64}" alt="QR Code" style="width: 100%; height: 100%; object-fit: contain;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
-                   <div style="width: 100%; height: 100%; background: #f5f5f5; display: none; align-items: center; justify-content: center; font-size: 12px; color: #666; font-family: 'Inter', Helvetica;">QR Code</div>
+                   <div style="width: 100%; height: 100%; display: none; align-items: center; justify-content: center; font-size: 12px; color: #666; font-family: 'Inter', Helvetica;">QR Code</div>
                  </div>` : 
-                `<div style="flex: 0 0 auto; width: 140px; height: 140px; background: #f5f5f5; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #666; font-family: 'Inter', Helvetica;">QR Code</div>`
+                `<div style="flex: 0 0 auto; width: 140px; height: 140px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #666; font-family: 'Inter', Helvetica;">QR Code</div>`
               }
               
               <!-- Sceau officiel et signature -->
               ${signatureUrl ? 
                 `<div style="flex: 0 0 auto; width: 280px; height: 180px; position: relative;">
                    <img src="${signatureUrl}" alt="Sceau officiel" style="width: 100%; height: 100%; object-fit: contain;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
-                   <div style="width: 100%; height: 100%; background: #f5f5f5; display: none; align-items: center; justify-content: center; font-size: 12px; color: #666; font-family: 'Inter', Helvetica;">Sceau officiel</div>
+                   <div style="width: 100%; height: 100%; display: none; align-items: center; justify-content: center; font-size: 12px; color: #666; font-family: 'Inter', Helvetica;">Sceau officiel</div>
                  </div>` : 
-                `<div style="flex: 0 0 auto; width: 280px; height: 180px; background: #f5f5f5; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #666; font-family: 'Inter', Helvetica;">Sceau officiel</div>`
+                `<div style="flex: 0 0 auto; width: 280px; height: 180px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #666; font-family: 'Inter', Helvetica;">Sceau officiel</div>`
               }
             </div>
           </div>
@@ -113,7 +113,6 @@ const CarteVersoGenerator = forwardRef<CarteVersoGeneratorRef, CarteVersoGenerat
         body {
             margin: 0;
             padding: 20px;
-            background: #f0f0f0;
             display: flex;
             justify-content: center;
             align-items: center;

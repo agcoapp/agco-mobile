@@ -85,8 +85,8 @@ const CarteRectoGenerator = forwardRef<CarteRectoGeneratorRef, CarteRectoGenerat
             <div style="position: absolute; width: 160px; height: 200px; top: 5px; left: 480px; background: white; border: 3px solid #029350; box-shadow: -4px 2px 6px rgba(0, 0, 0, 0.25);">
               ${photoUrl ? 
                 `<img src="${photoUrl}" alt="Photo du membre" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
-                 <div style="width: 100%; height: 100%; display: none; align-items: center; justify-content: center; background: #f5f5f5; color: #666; font-size: 14px; text-align: center; font-family: 'Inter'; font-style: italic;">Aucune photo</div>` : 
-                `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #f5f5f5; color: #666; font-size: 14px; text-align: center; font-family: 'Inter'; font-style: italic;">Aucune photo</div>`
+                 <div style="width: 100%; height: 100%; display: none; align-items: center; justify-content: center; color: #666; font-size: 14px; text-align: center; font-family: 'Inter'; font-style: italic;">Aucune photo</div>` : 
+                `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: #666; font-size: 14px; text-align: center; font-family: 'Inter'; font-style: italic;">Aucune photo</div>`
               }
             </div>
 
@@ -134,7 +134,6 @@ const CarteRectoGenerator = forwardRef<CarteRectoGeneratorRef, CarteRectoGenerat
         body {
             margin: 0;
             padding: 20px;
-            background: #f0f0f0;
             display: flex;
             justify-content: center;
             align-items: center;

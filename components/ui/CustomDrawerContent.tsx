@@ -84,8 +84,22 @@ export default function CustomDrawerContent(props: CustomDrawerContentProps) {
            </TouchableOpacity>
          )}
 
+        {/* Lien pour problème avec le profil si statut REJETE */}
+        {(user?.role === 'SECRETAIRE_GENERALE' || user?.role === 'PRESIDENT') && userStatus?.statut_formulaire?.statut === 'REJETE' && userStatus?.formulaire_adhesion?.donnees_snapshot?.employeur_ecole && (
+           <TouchableOpacity
+             style={styles.memberLink}
+             onPress={() => {
+               router.push('/register');
+             }}
+             activeOpacity={0.7}
+           >
+             <Ionicons name="warning-outline" size={24} color="#FF9500" />
+             <Text style={[styles.memberLinkText]}>Problème avec votre profil</Text>
+           </TouchableOpacity>
+         )}
+
         {/* Lien pour compléter le profil pour SECRETAIRE_GENERALE et PRESIDENT */}
-        {(user?.role === 'SECRETAIRE_GENERALE' || user?.role === 'PRESIDENT') && !userStatus?.formulaire_adhesion?.donnees_snapshot?.employeur_ecole && (
+        {(user?.role === 'SECRETAIRE_GENERALE' || user?.role === 'PRESIDENT') && userStatus?.statut_formulaire?.statut !== 'REJETE' && !userStatus?.formulaire_adhesion?.donnees_snapshot?.employeur_ecole && (
            <TouchableOpacity
              style={styles.memberLink}
              onPress={() => {
@@ -150,6 +164,10 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#666',
     marginLeft: 12,
+  },
+  alertText: {
+    color: '#FF9500',
+    fontWeight: '600',
   },
   logoutSection: {
     marginTop: 'auto',

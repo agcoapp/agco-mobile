@@ -121,8 +121,25 @@ export default function AdhesionsScreen() {
         setError(null);
         setAdhesions([]); // Reset avant chargement
         
+        // Essayer différents paramètres pour récupérer les adhésions normales
         const data = await apiService.getAdhesionForms();
-        console.log("📊 Données reçues de l'API:", data);
+        console.log("📊 Données reçues de l'API (adhésions normales):", data);
+        console.log("📊 Type de données:", typeof data);
+        console.log("📊 Clés disponibles:", data ? Object.keys(data) : 'null');
+        
+        // Essayer avec différents statuts
+        try {
+          const dataEnAttente = await apiService.getAdhesionForms({ statut: 'EN_ATTENTE' });
+          console.log("📊 Adhésions EN_ATTENTE:", dataEnAttente);
+          
+          const dataApprouve = await apiService.getAdhesionForms({ statut: 'APPROUVE' });
+          console.log("📊 Adhésions APPROUVE:", dataApprouve);
+          
+          const dataRejete = await apiService.getAdhesionForms({ statut: 'REJETE' });
+          console.log("📊 Adhésions REJETE:", dataRejete);
+        } catch (paramError) {
+          console.log("❌ Erreur avec paramètres:", paramError);
+        }
         
         // Traiter la structure spécifique de l'API avec plus de sécurité
         let processedData: any[] = [];
@@ -167,12 +184,18 @@ export default function AdhesionsScreen() {
         let adminFormulaires: any[] = [];
         try {
           const adminData = await apiService.getSecretaryAdminFormulaires();
+          console.log("📋 Données reçues de l'API (formulaires admin):", adminData);
+          console.log("📋 Type de données admin:", typeof adminData);
+          console.log("📋 Clés disponibles admin:", adminData ? Object.keys(adminData) : 'null');
+          
           if (adminData?.donnees?.formulaires) {
             adminFormulaires = adminData.donnees.formulaires;
             console.log("📋 Formulaires admin trouvés:", adminFormulaires.length);
+          } else {
+            console.log("📋 Aucun formulaire admin trouvé dans la structure attendue");
           }
         } catch (adminError) {
-          console.log('Pas de formulaires d\'administrateur trouvés:', adminError);
+          console.log('❌ Erreur lors du chargement des formulaires d\'administrateur:', adminError);
         }
         
         // Combiner les formulaires normaux avec les formulaires d'administrateur
@@ -183,9 +206,13 @@ export default function AdhesionsScreen() {
         // Debug : afficher la structure des premiers éléments
         if (allFormulaires.length > 0) {
           console.log("🔍 Structure premier formulaire:", allFormulaires[0]);
+          console.log("🔍 Type du premier formulaire:", allFormulaires[0]?.type);
           if (adminFormulaires.length > 0) {
             console.log("🔍 Structure premier formulaire admin:", adminFormulaires[0]);
+            console.log("🔍 Type du premier formulaire admin:", adminFormulaires[0]?.type);
           }
+        } else {
+          console.log("❌ Aucun formulaire chargé au total");
         }
         
         setAdhesions(allFormulaires);
@@ -236,6 +263,7 @@ export default function AdhesionsScreen() {
         } else if (data.formulaires && Array.isArray(data.formulaires)) {
           processedData = data.formulaires;
         }
+
       }
       
       // Validation supplémentaire des données
@@ -474,10 +502,14 @@ export default function AdhesionsScreen() {
         raison: reason
       });
       
-      console.log('✅ Formulaire d\'administrateur rejeté:', result);
-
-      // Mettre à jour la liste locale - les formulaires d'admin sont maintenant dans la liste principale
-      // Pas besoin de mise à jour séparée
+      // Mettre à jour la liste locale
+      setAdhesions(prevAdhesions => 
+        prevAdhesions.map(adhesion => 
+          adhesion.id === id 
+            ? { ...adhesion, statut: 'REJETE', raison_rejet: reason }
+            : adhesion
+        )
+      );
       
       Alert.alert('Succès', 'Le formulaire d\'administrateur a été rejeté', [
         {
@@ -1162,6 +1194,9 @@ export default function AdhesionsScreen() {
           <Text style={styles.timeText}>
             {formatTime(item.soumis_le || item.date_soumission)}
           </Text>
+          <Text style={styles.roleText}>
+            Rôle: {item.utilisateur.role}
+          </Text>
         </View>
         
         {tabValue === 2 && item.raison_rejet && (
@@ -1187,7 +1222,7 @@ export default function AdhesionsScreen() {
                 style={[styles.actionButton, styles.validateButton]}
                 onPress={() => {
                   setSelectedAdhesion(item);
-                  setIsAdminFormulaireContext(false);
+                  setIsAdminFormulaireContext(item.type === 'ADMIN_PERSONNEL');
                   setShowValidationModal(true);
                 }}
                 disabled={actionLoading === item.id}
@@ -1206,7 +1241,7 @@ export default function AdhesionsScreen() {
                 style={[styles.actionButton, styles.rejectButton]}
                 onPress={() => {
                   setSelectedAdhesion(item);
-                  setIsAdminFormulaireContext(false);
+                  setIsAdminFormulaireContext(item.type === 'ADMIN_PERSONNEL');
                   setShowRejectionModal(true);
                 }}
                 disabled={actionLoading === item.id}
@@ -1418,7 +1453,7 @@ export default function AdhesionsScreen() {
           animationType="slide"
           onRequestClose={() => setShowRejectionModal(false)}
         >
-                   <KeyboardAvoidingView 
+        <KeyboardAvoidingView 
            style={styles.modalOverlay}
            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
@@ -1709,6 +1744,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#8E8E93',
   },
+  roleText: {
+    fontSize: 12,
+    color: '#8E8E93',
+    marginTop: 4,
+  },
   rejectionReason: {
     marginBottom: 12,
     padding: 12,
@@ -1965,3 +2005,4 @@ const styles = StyleSheet.create({
      marginTop: 4,
    },
 });
+

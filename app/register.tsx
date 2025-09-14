@@ -19,10 +19,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-<<<<<<< HEAD
-=======
-  TouchableWithoutFeedback,
->>>>>>> 759b85208e94fde3cb9cf4ed5816c5c41e5fcecf
   View
 } from 'react-native';
 
@@ -1280,7 +1276,7 @@ export default function RegisterScreen() {
            </View>
          )}
 
-                 {showIdIssueDatePicker && (
+          {showIdIssueDatePicker && (
            <View style={styles.datePickerContainer}>
              {Platform.OS === 'ios' && (
                <View style={styles.datePickerHeader}>
@@ -1304,7 +1300,7 @@ export default function RegisterScreen() {
            </View>
          )}
 
-                 {showEntryDatePicker && (
+          {showEntryDatePicker && (
            <View style={styles.datePickerContainer}>
              {Platform.OS === 'ios' && (
                <View style={styles.datePickerHeader}>

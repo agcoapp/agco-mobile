@@ -79,7 +79,6 @@ export default function DashboardScreen() {
         
         // Récupérer les statistiques du tableau de bord via l'API
         const dashboardData = await apiService.getSecretaryDashboard();
-        
         // Récupérer les formulaires d'administrateur
         let adminStats = {
           totalAdminMembers: 0,
