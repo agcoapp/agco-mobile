@@ -19,7 +19,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View
 } from 'react-native';
 
@@ -410,18 +409,10 @@ export default function RegisterScreen() {
         const imageUri = result.assets[0].uri;
         console.log('Image sélectionnée (caméra):', imageUri);
         
-        // Post-traitement avancé avec ImageManipulator
+        // Post-traitement avec compression seulement (garder les dimensions originales)
         const processedImage = await ImageManipulator.manipulateAsync(
           imageUri,
-          [
-            {
-              resize: {
-                width: 300,
-                height: 400,
-              },
-            },
-
-          ],
+          [], // Pas de redimensionnement
           {
             compress: 0.85,
             format: ImageManipulator.SaveFormat.JPEG,
@@ -464,17 +455,10 @@ export default function RegisterScreen() {
         const imageUri = result.assets[0].uri;
         console.log('Image sélectionnée (galerie):', imageUri);
         
-        // Post-traitement avancé avec ImageManipulator
+        // Post-traitement avec compression seulement (garder les dimensions originales)
         const processedImage = await ImageManipulator.manipulateAsync(
           imageUri,
-          [
-            {
-              resize: {
-                width: 300,
-                height: 400,
-              },
-            },
-          ],
+          [], // Pas de redimensionnement
           {
             compress: 0.85,
             format: ImageManipulator.SaveFormat.JPEG,
@@ -1010,7 +994,6 @@ export default function RegisterScreen() {
   );
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <SafeAreaView style={styles.container}>
         <KeyboardAvoidingView 
           style={styles.keyboardAvoidingView}
@@ -1079,7 +1062,11 @@ export default function RegisterScreen() {
                              {photoPreview ? (
                  <View style={styles.photoPreview}>
                    <TouchableOpacity onPress={() => openImageModal(photoPreview)}>
-                     <Image source={{ uri: photoPreview }} style={styles.photoImage} />
+                     <Image 
+                      source={{ uri: photoPreview }} 
+                      style={styles.photoImage}
+                      resizeMode="contain"
+                    />
                    </TouchableOpacity>
                    <TouchableOpacity 
                      style={styles.removeButton}
@@ -1369,7 +1356,6 @@ export default function RegisterScreen() {
           }}
         />
       </SafeAreaView>
-    </TouchableWithoutFeedback>
   );
 }
 
@@ -1536,12 +1522,10 @@ const styles = StyleSheet.create({
   },
   photoContainer: {
     borderRadius: 12,
-    padding: 10,
+    padding: 15,
     backgroundColor: 'white',
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 150,
-    minWidth: 120,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -1565,11 +1549,13 @@ const styles = StyleSheet.create({
   },
   photoPreview: {
     position: 'relative',
+    width: "100%",
   },
   photoImage: {
-    width: 200,
-    height: 200,
     borderRadius: 8,
+    backgroundColor: '#f8f9fa',
+    width: 250,
+    height: 250,
   },
   signatureContainer: {
     borderRadius: 12,
@@ -1604,8 +1590,8 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   signatureImage: {
-    width: 200,
-    height: 200,
+    width: 250,
+    height: 250,
     borderRadius: 8,
   },
   removeButton: {
@@ -1697,7 +1683,7 @@ const styles = StyleSheet.create({
      alignItems: 'center',
      zIndex: 1001,
    },
-       fullScreenImage: {
+    fullScreenImage: {
       width: width,
       height: height * 0.9,
       maxWidth: width,

@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Dimensions,
   Image,
@@ -20,9 +20,7 @@ export default function ImageViewer({ imageUri, onClose }: ImageViewerProps) {
   const [scaleValue, setScaleValue] = useState(1);
   const [translateX, setTranslateX] = useState(0);
   const [translateY, setTranslateY] = useState(0);
-  const [showInstructions, setShowInstructions] = useState(true);
   const [lastTap, setLastTap] = useState(0);
-  const instructionsTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Variables pour le zoom au pincement
   const [pinchDistance, setPinchDistance] = useState<number | null>(null);
@@ -32,26 +30,6 @@ export default function ImageViewer({ imageUri, onClose }: ImageViewerProps) {
   const [panStartX, setPanStartX] = useState(0);
   const [panStartY, setPanStartY] = useState(0);
 
-  // Fermer automatiquement les instructions après 3 secondes
-  useEffect(() => {
-    instructionsTimeout.current = setTimeout(() => {
-      setShowInstructions(false);
-    }, 3000);
-
-    return () => {
-      if (instructionsTimeout.current) {
-        clearTimeout(instructionsTimeout.current);
-      }
-    };
-  }, []);
-
-  const hideInstructions = () => {
-    setShowInstructions(false);
-    if (instructionsTimeout.current) {
-      clearTimeout(instructionsTimeout.current);
-      instructionsTimeout.current = null;
-    }
-  };
 
   const getDistance = (touch1: any, touch2: any) => {
     return Math.sqrt(
@@ -69,7 +47,6 @@ export default function ImageViewer({ imageUri, onClose }: ImageViewerProps) {
 
   // Gestion des événements de touch natifs
   const handleTouchStart = (evt: any) => {
-    hideInstructions();
     const touches = evt.nativeEvent.touches;
     console.log('🖱️ Touch Start - Touches:', touches.length);
     
@@ -147,26 +124,6 @@ export default function ImageViewer({ imageUri, onClose }: ImageViewerProps) {
 
   return (
     <View style={styles.container}>
-      {/* Instructions d'utilisation */}
-      {showInstructions && (
-        <TouchableOpacity 
-          style={styles.instructionsContainer} 
-          onPress={hideInstructions}
-          activeOpacity={1}
-        >
-          <View style={styles.instructionsBox}>
-            <Ionicons name="hand-left-outline" size={32} color="white" />
-            <Text style={styles.instructionsTitle}>Zoom et Navigation</Text>
-            <Text style={styles.instructionsText}>
-              • Pincez avec 2 doigts pour zoomer{'\n'}
-              • Glissez avec 1 doigt pour naviguer{'\n'}
-              • Double-tap pour fermer{'\n'}
-              • Appuyez pour fermer cette aide
-            </Text>
-          </View>
-        </TouchableOpacity>
-      )}
-
       {/* Bouton de fermeture */}
       {onClose && (
         <TouchableOpacity style={styles.closeButton} onPress={onClose}>
