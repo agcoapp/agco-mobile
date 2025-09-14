@@ -19,6 +19,10 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+<<<<<<< HEAD
+=======
+  TouchableWithoutFeedback,
+>>>>>>> 759b85208e94fde3cb9cf4ed5816c5c41e5fcecf
   View
 } from 'react-native';
 
