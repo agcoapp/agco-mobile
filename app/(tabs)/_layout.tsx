@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Drawer } from 'expo-router/drawer';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Image, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import CustomDrawerContent from '../../components/ui/CustomDrawerContent';
 import { useAuth } from '../../hooks/useAuth';
@@ -19,7 +19,7 @@ export default function TabLayout() {
         key="index"
         name="index"
         options={{
-          title: 'Tableau de bord',
+          title: 'Tableau De Bord',
           drawerIcon: ({ color, size }: { color: string; size: number }) => (
             <Ionicons name="grid-outline" size={size} color={color} />
           ),
@@ -35,7 +35,7 @@ export default function TabLayout() {
           key="adhesion/[id]"
           name="adhesion/[id]"
           options={{
-            title: "Ma fiche d'adhésion",
+            title: "Ma Fiche D'adhésion",
             drawerIcon: ({ color, size }: { color: string; size: number }) => (
               <Ionicons name="people-outline" size={size} color={color} />
             ),
@@ -45,7 +45,7 @@ export default function TabLayout() {
           key="membres"
           name="membres"
           options={{
-            title: 'Les membres',
+            title: 'Membres',
             drawerIcon: ({ color, size }: { color: string; size: number }) => (
               <Ionicons name="people-outline" size={size} color={color} />
             ),
@@ -55,7 +55,7 @@ export default function TabLayout() {
           key="documents"
           name="documents"
           options={{
-            title: 'Textes officiels',
+            title: 'Textes Officiels',
             drawerIcon: ({ color, size }: { color: string; size: number }) => (
               <Ionicons name="document-text-outline" size={size} color={color} />
             ),
@@ -65,7 +65,7 @@ export default function TabLayout() {
           key="change-password"
           name="change-password"
           options={{
-            title: 'Changer mot de passe',
+            title: 'Changer Mon Mot De Passe',
             drawerIcon: ({ color, size }: { color: string; size: number }) => (
               <Ionicons name="key-outline" size={size} color={color} />
             ),
@@ -101,7 +101,7 @@ export default function TabLayout() {
           key="cartes"
           name="cartes"
           options={{
-            title: 'Cartes de membres',
+            title: 'Cartes De Membres',
             drawerIcon: ({ color, size }: { color: string; size: number }) => (
               <Ionicons name="card-outline" size={size} color={color} />
             ),
@@ -111,7 +111,7 @@ export default function TabLayout() {
           key="documents"
           name="documents"
           options={{
-            title: 'Textes officiels',
+            title: 'Textes Officiels',
             drawerIcon: ({ color, size }: { color: string; size: number }) => (
               <Ionicons name="document-text-outline" size={size} color={color} />
             ),
@@ -126,7 +126,7 @@ export default function TabLayout() {
             key="codes"
             name="codes"
             options={{
-              title: 'Codes d\'accès',
+              title: 'Codes D\'Accès',
               drawerIcon: ({ color, size }: { color: string; size: number }) => (
                 <Ionicons name="key-outline" size={size} color={color} />
               ),
@@ -141,7 +141,7 @@ export default function TabLayout() {
           key="settings"
           name="settings"
         options={{
-            title: 'Signature du Président',
+            title: 'Signature Du Président',
             drawerIcon: ({ color, size }: { color: string; size: number }) => (
               <Ionicons name="create-outline" size={size} color={color} />
             ),
@@ -154,7 +154,7 @@ export default function TabLayout() {
           key="change-password"
           name="change-password"
           options={{
-            title: 'Changer mot de passe',
+            title: 'Changer Mon Mot De Passe',
             drawerIcon: ({ color, size }: { color: string; size: number }) => (
               <Ionicons name="key-outline" size={size} color={color} />
             ),

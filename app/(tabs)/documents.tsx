@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as WebBrowser from 'expo-web-browser';
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -57,7 +58,12 @@ export default function DocumentsScreen() {
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [dateFilter, setDateFilter] = useState<string>('');
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [tempStartDate, setTempStartDate] = useState<Date | null>(null);
+  const [tempEndDate, setTempEndDate] = useState<Date | null>(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadForm, setUploadForm] = useState({
     title: '',
@@ -508,9 +514,73 @@ export default function DocumentsScreen() {
     return `le ${dateFormatted} à ${timeFormatted}`;
   };
 
+  // Fonction de validation des dates
+  const validateDates = (start: Date | null, end: Date | null): string | null => {
+    if (start && end) {
+      const startDateOnly = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+      const endDateOnly = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+      
+      if (startDateOnly > endDateOnly) {
+        return 'La date de début doit être inférieure ou égale à la date de fin.';
+      }
+    }
+    return null;
+  };
+
+  // Fonctions de gestion des DatePickers modaux
+  const handleStartDatePickerOpen = () => {
+    setTempStartDate(startDate || new Date());
+    setShowStartDatePicker(true);
+  };
+
+  const handleEndDatePickerOpen = () => {
+    setTempEndDate(endDate || new Date());
+    setShowEndDatePicker(true);
+  };
+
+  const handleStartDateConfirm = () => {
+    if (tempStartDate) {
+      const validationError = validateDates(tempStartDate, endDate);
+      if (validationError) {
+        setToastMessage(validationError);
+        setToastType('error');
+        setShowToast(true);
+        setShowStartDatePicker(false);
+        return;
+      }
+      setStartDate(tempStartDate);
+    }
+    setShowStartDatePicker(false);
+  };
+
+  const handleEndDateConfirm = () => {
+    if (tempEndDate) {
+      const validationError = validateDates(startDate, tempEndDate);
+      if (validationError) {
+        setToastMessage(validationError);
+        setToastType('error');
+        setShowToast(true);
+        setShowEndDatePicker(false);
+        return;
+      }
+      setEndDate(tempEndDate);
+    }
+    setShowEndDatePicker(false);
+  };
+
+  const handleStartDateCancel = () => {
+    setShowStartDatePicker(false);
+    setTempStartDate(null);
+  };
+
+  const handleEndDateCancel = () => {
+    setShowEndDatePicker(false);
+    setTempEndDate(null);
+  };
+
   // Fonction de filtrage des documents
   const filterDocuments = (documents: Document[]) => {
-    if (!searchTerm.trim() && !dateFilter) return documents;
+    if (!searchTerm.trim() && !startDate && !endDate) return documents;
     
     let filtered = documents;
 
@@ -523,10 +593,28 @@ export default function DocumentsScreen() {
       );
     }
 
-    if (dateFilter) {
-      filtered = filtered.filter(doc => 
-        doc.telecharge_le && new Date(doc.telecharge_le).toISOString().startsWith(dateFilter)
-      );
+    // Filtrage par date de début et fin
+    if (startDate || endDate) {
+      filtered = filtered.filter(doc => {
+        if (!doc.telecharge_le) return false;
+        
+        const docDate = new Date(doc.telecharge_le);
+        const docDateOnly = new Date(docDate.getFullYear(), docDate.getMonth(), docDate.getDate());
+        
+        if (startDate && endDate) {
+          const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+          const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+          return docDateOnly >= startDateOnly && docDateOnly <= endDateOnly;
+        } else if (startDate) {
+          const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+          return docDateOnly >= startDateOnly;
+        } else if (endDate) {
+          const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+          return docDateOnly <= endDateOnly;
+        }
+        
+        return true;
+      });
     }
     
     return filtered.sort((a, b) => {
@@ -566,7 +654,8 @@ export default function DocumentsScreen() {
       fileSize: 0
     });
     setNewlyAddedDocument(null);
-    setDateFilter('');
+    setStartDate(null);
+    setEndDate(null);
   };
 
   const handleDeleteDocument = (document: Document) => {
@@ -696,7 +785,7 @@ export default function DocumentsScreen() {
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.content}>          
           {/* Titre */}
-          <Text style={styles.title}>Textes Officiels de l'association</Text>
+          <Text style={styles.title}>Textes Officiels De L'Association</Text>
 
           {/* Champ de recherche et bouton d'upload */}
           <View style={styles.searchContainer}>
@@ -717,7 +806,68 @@ export default function DocumentsScreen() {
                 onPress={handleUploadModalOpen}
               >
                 <Ionicons name="cloud-upload-outline" size={20} color="white" />
-                <Text style={styles.uploadButtonText}>Téléverser un document</Text>
+                <Text style={styles.uploadButtonText}>Téléverser Un Texte Officiel</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Filtres de date */}
+          <View style={styles.dateFiltersContainer}>
+            <View style={styles.dateFilterRow}>
+              <View style={styles.dateFilterItem}>
+                <Text style={styles.dateFilterLabel}>Date de début</Text>
+                <TouchableOpacity
+                  style={styles.dateButton}
+                  onPress={handleStartDatePickerOpen}
+                >
+                  <Ionicons name="calendar-outline" size={16} color="#007AFF" />
+                  <Text style={styles.dateButtonText}>
+                    {startDate ? startDate.toLocaleDateString('fr-FR') : 'Sélectionner'}
+                  </Text>
+                </TouchableOpacity>
+                {startDate && (
+                  <TouchableOpacity
+                    style={styles.clearDateButton}
+                    onPress={() => setStartDate(null)}
+                  >
+                    <Ionicons name="close-circle" size={16} color="#FF3B30" />
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              <View style={styles.dateFilterItem}>
+                <Text style={styles.dateFilterLabel}>Date de fin</Text>
+                <TouchableOpacity
+                  style={styles.dateButton}
+                  onPress={handleEndDatePickerOpen}
+                >
+                  <Ionicons name="calendar-outline" size={16} color="#007AFF" />
+                  <Text style={styles.dateButtonText}>
+                    {endDate ? endDate.toLocaleDateString('fr-FR') : 'Sélectionner'}
+                  </Text>
+                </TouchableOpacity>
+                {endDate && (
+                  <TouchableOpacity
+                    style={styles.clearDateButton}
+                    onPress={() => setEndDate(null)}
+                  >
+                    <Ionicons name="close-circle" size={16} color="#FF3B30" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+
+            {/* Bouton pour effacer tous les filtres de date */}
+            {(startDate || endDate) && (
+              <TouchableOpacity
+                style={styles.clearAllDatesButton}
+                onPress={() => {
+                  setStartDate(null);
+                  setEndDate(null);
+                }}
+              >
+                <Ionicons name="refresh-outline" size={16} color="#FF3B30" />
+                <Text style={styles.clearAllDatesButtonText}>Effacer les filtres de date</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -770,11 +920,18 @@ export default function DocumentsScreen() {
                     </View>
                     
                     <View style={styles.tabHeaderRight}>
-                      {(searchTerm || dateFilter) && (
+                      {(searchTerm || startDate || endDate) && (
                         <Text style={styles.filterResults}>
                           {filterDocuments(documents[category.id] || []).length} résultat{filterDocuments(documents[category.id] || []).length > 1 ? 's' : ''} trouvé{filterDocuments(documents[category.id] || []).length > 1 ? 's' : ''}
-                          {dateFilter && (
-                            <Text> pour le {new Date(dateFilter).toLocaleDateString('fr-FR')}</Text>
+                          {(startDate || endDate) && (
+                            <Text>
+                              {startDate && endDate 
+                                ? ` du ${startDate.toLocaleDateString('fr-FR')} au ${endDate.toLocaleDateString('fr-FR')}`
+                                : startDate 
+                                ? ` à partir du ${startDate.toLocaleDateString('fr-FR')}`
+                                : ` jusqu'au ${endDate?.toLocaleDateString('fr-FR')}`
+                              }
+                            </Text>
                           )}
                         </Text>
                       )}
@@ -844,7 +1001,7 @@ export default function DocumentsScreen() {
                   {filterDocuments(documents[category.id] || []).length === 0 && (
                     <View style={styles.emptyContainer}>
                       <Text style={styles.emptyText}>
-                        Aucun document disponible dans cette catégorie
+                        Aucun texte officiel disponible dans cette catégorie
                       </Text>
                     </View>
                   )}
@@ -1216,6 +1373,76 @@ export default function DocumentsScreen() {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Modal DateTimePicker pour la date de début */}
+      <Modal
+        visible={showStartDatePicker}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={handleStartDateCancel}
+      >
+        <View style={styles.datePickerModalOverlay}>
+          <View style={styles.datePickerModalContainer}>
+            <View style={styles.datePickerModalHeader}>
+              <TouchableOpacity onPress={handleStartDateCancel}>
+                <Text style={styles.datePickerCancelButton}>Annuler</Text>
+              </TouchableOpacity>
+              <Text style={styles.datePickerModalTitle}>Date de début</Text>
+              <TouchableOpacity onPress={handleStartDateConfirm}>
+                <Text style={styles.datePickerConfirmButton}>Terminer</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.datePickerContainer}>
+              <DateTimePicker
+                value={tempStartDate || new Date()}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event, selectedDate) => {
+                  if (selectedDate) {
+                    setTempStartDate(selectedDate);
+                  }
+                }}
+                style={styles.datePicker}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal DateTimePicker pour la date de fin */}
+      <Modal
+        visible={showEndDatePicker}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={handleEndDateCancel}
+      >
+        <View style={styles.datePickerModalOverlay}>
+          <View style={styles.datePickerModalContainer}>
+            <View style={styles.datePickerModalHeader}>
+              <TouchableOpacity onPress={handleEndDateCancel}>
+                <Text style={styles.datePickerCancelButton}>Annuler</Text>
+              </TouchableOpacity>
+              <Text style={styles.datePickerModalTitle}>Date de fin</Text>
+              <TouchableOpacity onPress={handleEndDateConfirm}>
+                <Text style={styles.datePickerConfirmButton}>Terminer</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.datePickerContainer}>
+              <DateTimePicker
+                value={tempEndDate || new Date()}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event, selectedDate) => {
+                  if (selectedDate) {
+                    setTempEndDate(selectedDate);
+                  }
+                }}
+                style={styles.datePicker}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1803,5 +2030,117 @@ const styles = StyleSheet.create({
   },
   categoryScrollView: {
     marginBottom: 16,
+  },
+  // Styles pour les filtres de date
+  dateFiltersContainer: {
+    backgroundColor: 'white',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  dateFilterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  dateFilterItem: {
+    flex: 1,
+    position: 'relative',
+  },
+  dateFilterLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 8,
+    fontWeight: '600',
+  },
+  dateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+  dateButtonText: {
+    fontSize: 14,
+    color: '#333',
+    flex: 1,
+  },
+  clearDateButton: {
+    position: 'absolute',
+    top: 28,
+    right: 8,
+    padding: 4,
+    backgroundColor: 'white',
+    borderRadius: 12,
+  },
+  clearAllDatesButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFEBEE',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginTop: 12,
+    gap: 6,
+  },
+  clearAllDatesButtonText: {
+    fontSize: 14,
+    color: '#FF3B30',
+    fontWeight: '600',
+  },
+  // Styles pour les modales de DatePicker
+  datePickerModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  datePickerModalContainer: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+  },
+  datePickerModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  datePickerModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+  },
+  datePickerCancelButton: {
+    fontSize: 16,
+    color: '#FF3B30',
+    fontWeight: '500',
+  },
+  datePickerConfirmButton: {
+    fontSize: 16,
+    color: '#007AFF',
+    fontWeight: '600',
+  },
+  datePickerContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+  },
+  datePicker: {
+    width: '100%',
+    backgroundColor: 'white',
   },
 });

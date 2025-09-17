@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -1197,7 +1197,7 @@ export default function AdhesionsScreen() {
             {formatTime(item.soumis_le || item.date_soumission)}
           </Text>
           <Text style={styles.roleText}>
-            Rôle: {item.utilisateur?.role || 'Membre'}
+            Rôle: {item.type === "ADMIN_PERSONNEL" ? item?.utilisateur?.role : "MEMBRE"}
           </Text>
           
           {/* Afficher le numéro d'adhérant pour les adhésions validées */}

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   Alert,
   Keyboard,
@@ -18,7 +18,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { apiService } from '../../services/apiService';
 
 export default function ChangePasswordScreen() {
-  const { user, updateUserProfile } = useAuth();
+  const { user, updateUserProfile, logout } = useAuth();
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -76,21 +76,28 @@ export default function ChangePasswordScreen() {
         // Continuer même si la mise à jour échoue
       }
 
-      setSuccess('Mot de passe changé avec succès');
+      setSuccess('Mot de passe changé avec succès. Déconnexion en cours...');
       setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
       
-      // Rediriger vers le dashboard après 2 secondes
-      setTimeout(() => {
-        router.back();
+      // Déconnecter l'utilisateur après 2 secondes
+      setTimeout(async () => {
+        try {
+          await logout();
+          console.log('✅ Utilisateur déconnecté après changement de mot de passe');
+        } catch (logoutError) {
+          console.error('⚠️ Erreur lors de la déconnexion:', logoutError);
+          // Rediriger vers la page de connexion même si la déconnexion échoue
+          router.replace('/login');
+        }
       }, 2000);
 
     } catch (error: any) {
       console.error('Erreur lors du changement de mot de passe:', error);
       Alert.alert(
         'Erreur',
-        error.response?.data?.message || 'Votre ancien mot de passe est incorrect'
+        error.response?.data?.message || 'Votre Ancien Mot De Passe Est Incorrect'
       );
     } finally {
       setLoading(false);
@@ -115,7 +122,7 @@ export default function ChangePasswordScreen() {
           {/* Header */}
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
             <View style={styles.form}>
-              <Text style={styles.title}>Changer le mot de passe</Text>
+              <Text style={styles.title}>Changer Mon Mot De Passe</Text>
 
               {/* Message de succès */}
               {success && (
@@ -127,13 +134,13 @@ export default function ChangePasswordScreen() {
 
               {/* Ancien mot de passe */}
               <View style={styles.inputContainer}>
-                <Text style={styles.label}>Ancien mot de passe</Text>
+                <Text style={styles.label}>Ancien Mot De Passe</Text>
                 <View style={styles.passwordContainer}>
                   <TextInput
                     style={styles.passwordInput}
                     value={oldPassword}
                     onChangeText={setOldPassword}
-                    placeholder="Saisissez votre ancien mot de passe"
+                    placeholder="Saisissez Votre Ancien Mot De Passe"
                     secureTextEntry={!showOldPassword}
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -154,13 +161,13 @@ export default function ChangePasswordScreen() {
 
               {/* Nouveau mot de passe */}
               <View style={styles.inputContainer}>
-                <Text style={styles.label}>Nouveau mot de passe</Text>
+                <Text style={styles.label}>Nouveau Mot De Passe</Text>
                 <View style={styles.passwordContainer}>
                   <TextInput
                     style={styles.passwordInput}
                     value={newPassword}
                     onChangeText={setNewPassword}
-                    placeholder="Saisissez votre nouveau mot de passe"
+                    placeholder="Saisissez Votre Nouveau Mot De Passe"
                     secureTextEntry={!showNewPassword}
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -178,20 +185,20 @@ export default function ChangePasswordScreen() {
                   </TouchableOpacity>
             </View>
                 <Text style={styles.helperText}>
-                  Le mot de passe doit contenir au minimum 8 caractères et être sécurisé
+                  Le mot de passe doit contenir au minimum 8 caractères et être sécurisé.
                 </Text>
             </View>
 
 
               {/* Confirmation du nouveau mot de passe */}
               <View style={styles.inputContainer}>
-                <Text style={styles.label}>Confirmer le nouveau mot de passe</Text>
+                <Text style={styles.label}>Confirmer Le Nouveau Mot De Passe</Text>
                 <View style={styles.passwordContainer}>
                   <TextInput
                     style={styles.passwordInput}
                     value={confirmPassword}
                     onChangeText={setConfirmPassword}
-                    placeholder="Confirmez votre nouveau mot de passe"
+                    placeholder="Confirmez Votre Nouveau Mot De Passe"
                     secureTextEntry={!showConfirmPassword}
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -217,7 +224,7 @@ export default function ChangePasswordScreen() {
                 disabled={loading}
           >
                 <Text style={styles.submitButtonText}>
-                  {loading ? 'Changement en cours...' : 'Changer le mot de passe'}
+                  {loading ? 'Changement En Cours...' : 'Changer Le Mot De Passe'}
                 </Text>
           </TouchableOpacity>
         </View>

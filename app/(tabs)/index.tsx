@@ -4,7 +4,7 @@ import * as MediaLibrary from 'expo-media-library';
 import * as Print from 'expo-print';
 import { router } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -633,8 +633,8 @@ export default function DashboardScreen() {
                   }}
                 >
                   <Ionicons name="person-add-outline" size={48} color="#007AFF" />
-                  <Text style={styles.actionTitle}>Ma fiche D'Adhésion</Text>
-                  <Text style={styles.actionSubtitle}>Consulter Vos Informations</Text>
+                  <Text style={styles.actionTitle}>Ma Fiche D'Adhésion</Text>
+                  <Text style={styles.actionSubtitle}>Consulter Mes Informations</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -642,8 +642,8 @@ export default function DashboardScreen() {
                   onPress={() => router.push('/(tabs)/change-password')}
                 >
                   <Ionicons name="key-outline" size={48} color="#AF52DE" />
-                  <Text style={styles.actionTitle}>Sécurité du compte</Text>
-                  <Text style={styles.actionSubtitle}>Changer votre mot de passe</Text>
+                  <Text style={styles.actionTitle}>Sécurité Du Compte</Text>
+                  <Text style={styles.actionSubtitle}>Changer Mon Mot De Passe</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -757,15 +757,15 @@ export default function DashboardScreen() {
                 style={styles.actionCard}
                 onPress={() => router.push('/(tabs)/adhesions')}
               >
-                <Text style={styles.actionTitle}>Liste Des Adhésions</Text>
-                <Text style={styles.actionSubtitle}>Gérer Les Demandes d'Adhésion</Text>
+                <Text style={styles.actionTitle}>Adhésions</Text>
+                <Text style={styles.actionSubtitle}>{user?.role === "SECRETAIRE_GENERALE" ? "Gérer Les Demandes D'Adhésions" : "Voir La Liste Des Demandes D'Adhésions"}</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
                 style={styles.actionCard}
                 onPress={() => router.push('/(tabs)/cartes')}
               >
-                <Text style={styles.actionTitle}>Cartes Des Membres</Text>
+                <Text style={styles.actionTitle}>Cartes De Membres</Text>
                 <Text style={styles.actionSubtitle}>Voir Et Télécharger Les Cartes De Membres</Text>
               </TouchableOpacity>
               
