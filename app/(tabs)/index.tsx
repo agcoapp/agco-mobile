@@ -478,17 +478,6 @@ export default function DashboardScreen() {
     loadMembersCount();
   }, [user]);
 
-  const handleCardClick = (route: string) => {
-    if (route === '/membres') {
-      router.push('/(tabs)/membres');
-    } else if (route === '/adhesions') {
-      router.push('/(tabs)/adhesions');
-    } else if (route === '/cartes') {
-      router.push('/(tabs)/cartes');
-    } else if (route === '/codes') {
-      router.push('/(tabs)/codes');
-    }
-  };
 
   const handleStatCardClick = (card: any) => {
     if (card.route === '/membres') {

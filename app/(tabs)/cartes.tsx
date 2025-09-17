@@ -3,7 +3,7 @@ import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -53,6 +53,11 @@ export default function CartesScreen() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  
+  // États de pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalPages, setTotalPages] = useState(0);
 
   const loadApprovedMembers = useCallback(async () => {
     try {
@@ -95,8 +100,9 @@ export default function CartesScreen() {
     }
   }, []);
 
-  // Filtrer les membres selon le terme de recherche
-  const getFilteredMembers = () => {
+
+  // Calculer les membres filtrés avec useMemo pour éviter les re-rendus
+  const filteredMembers = useMemo(() => {
     if (!searchTerm) return approvedMembers;
     
     const searchLower = searchTerm.toLowerCase();
@@ -105,7 +111,73 @@ export default function CartesScreen() {
       (member.numero_adhesion?.toLowerCase() || '').includes(searchLower) ||
       (member.code_formulaire?.toLowerCase() || '').includes(searchLower)
     );
+  }, [approvedMembers, searchTerm]);
+
+  // Calculer la pagination avec useMemo
+  const paginationData = useMemo(() => {
+    const totalItems = filteredMembers.length;
+    const totalPagesCount = Math.ceil(totalItems / itemsPerPage);
+    
+    // Réinitialiser à la page 1 si la page courante dépasse le nombre total de pages
+    let adjustedCurrentPage = currentPage;
+    if (currentPage > totalPagesCount && totalPagesCount > 0) {
+      adjustedCurrentPage = 1;
+    }
+    
+    const startIndex = (adjustedCurrentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedMembers = filteredMembers.slice(startIndex, endIndex);
+    
+    return {
+      paginatedMembers,
+      totalPagesCount,
+      adjustedCurrentPage,
+      totalItems
+    };
+  }, [filteredMembers, currentPage, itemsPerPage]);
+
+  // Mettre à jour les états de pagination avec useEffect
+  useEffect(() => {
+    setTotalPages(paginationData.totalPagesCount);
+    if (paginationData.adjustedCurrentPage !== currentPage) {
+      setCurrentPage(paginationData.adjustedCurrentPage);
+    }
+  }, [paginationData.totalPagesCount, paginationData.adjustedCurrentPage, currentPage]);
+
+  // Fonctions de navigation de pagination
+  const goToPage = (page: number) => {
+    const totalPagesCount = paginationData.totalPagesCount;
+    
+    if (page >= 1 && page <= totalPagesCount) {
+      setCurrentPage(page);
+    }
   };
+
+  const goToNextPage = () => {
+    goToPage(currentPage + 1);
+  };
+
+  const goToPreviousPage = () => {
+    goToPage(currentPage - 1);
+  };
+
+  const goToFirstPage = () => {
+    goToPage(1);
+  };
+
+  const goToLastPage = () => {
+    goToPage(paginationData.totalPagesCount);
+  };
+
+  // Réinitialiser la pagination quand la recherche change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  // Réinitialiser la pagination quand les données changent
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [approvedMembers]);
 
   const handleSelectCard = (memberId: string) => {
     const newSelected = new Set(selectedCards);
@@ -118,12 +190,35 @@ export default function CartesScreen() {
   };
 
   const handleSelectAll = () => {
-    const filteredMembers = getFilteredMembers();
     if (selectedCards.size === filteredMembers.length) {
       setSelectedCards(new Set());
     } else {
       setSelectedCards(new Set(filteredMembers.map(member => member.id.toString())));
     }
+  };
+
+  // Fonction pour vérifier si tous les éléments de la page courante sont sélectionnés
+  const isAllCurrentPageSelected = () => {
+    return paginationData.paginatedMembers.every(member => selectedCards.has(member.id.toString()));
+  };
+
+  // Fonction pour sélectionner/désélectionner tous les éléments de la page courante
+  const handleSelectCurrentPage = () => {
+    const newSelected = new Set(selectedCards);
+    
+    if (isAllCurrentPageSelected()) {
+      // Désélectionner tous les éléments de la page courante
+      paginationData.paginatedMembers.forEach(member => {
+        newSelected.delete(member.id.toString());
+      });
+    } else {
+      // Sélectionner tous les éléments de la page courante
+      paginationData.paginatedMembers.forEach(member => {
+        newSelected.add(member.id.toString());
+      });
+    }
+    
+    setSelectedCards(newSelected);
   };
 
   // Fonction pour afficher l'image en plein écran
@@ -632,7 +727,100 @@ export default function CartesScreen() {
     );
   }
 
-  const filteredMembers = getFilteredMembers();
+  // Composant de contrôles de pagination
+  const PaginationControls = () => {
+    const totalItems = paginationData.totalItems;
+    const totalPagesCount = paginationData.totalPagesCount;
+    
+    if (totalPagesCount <= 1) return null;
+
+    const startItem = (currentPage - 1) * itemsPerPage + 1;
+    const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+
+    return (
+      <View style={styles.paginationContainer}>
+        <View style={styles.paginationInfo}>
+          <Text style={styles.paginationText}>
+            {startItem}-{endItem} sur {totalItems} membres
+          </Text>
+          <Text style={styles.cardsCountText}>
+            {totalItems === 1 
+              ? `1 carte trouvée`
+              : totalItems <= itemsPerPage
+              ? `${totalItems} cartes au total`
+              : `Page ${currentPage} sur ${totalPagesCount} - ${totalItems} cartes au total`
+            }
+          </Text>
+        </View>
+        
+        <View style={styles.paginationControls}>
+          <TouchableOpacity
+            style={[styles.paginationButton, currentPage === 1 && styles.paginationButtonDisabled]}
+            onPress={goToFirstPage}
+            disabled={currentPage === 1}
+          >
+            <Ionicons name="chevron-back" size={20} color={currentPage === 1 ? "#999" : "#007AFF"} />
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.paginationButton, currentPage === 1 && styles.paginationButtonDisabled]}
+            onPress={goToPreviousPage}
+            disabled={currentPage === 1}
+          >
+            <Ionicons name="chevron-back-outline" size={20} color={currentPage === 1 ? "#999" : "#007AFF"} />
+          </TouchableOpacity>
+          
+          <View style={styles.pageIndicator}>
+            <Text style={styles.pageIndicatorText}>
+              {currentPage} / {totalPagesCount}
+            </Text>
+          </View>
+          
+          <TouchableOpacity
+            style={[styles.paginationButton, currentPage === totalPagesCount && styles.paginationButtonDisabled]}
+            onPress={goToNextPage}
+            disabled={currentPage === totalPagesCount}
+          >
+            <Ionicons name="chevron-forward-outline" size={20} color={currentPage === totalPagesCount ? "#999" : "#007AFF"} />
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.paginationButton, currentPage === totalPagesCount && styles.paginationButtonDisabled]}
+            onPress={goToLastPage}
+            disabled={currentPage === totalPagesCount}
+          >
+            <Ionicons name="chevron-forward" size={20} color={currentPage === totalPagesCount ? "#999" : "#007AFF"} />
+          </TouchableOpacity>
+        </View>
+        
+        <View style={styles.itemsPerPageContainer}>
+          <Text style={styles.itemsPerPageLabel}>Éléments par page:</Text>
+          <View style={styles.itemsPerPageButtons}>
+            {[5, 10, 20, 50].map((count) => (
+              <TouchableOpacity
+                key={count}
+                style={[
+                  styles.itemsPerPageButton,
+                  itemsPerPage === count && styles.itemsPerPageButtonActive
+                ]}
+                onPress={() => {
+                  setItemsPerPage(count);
+                  setCurrentPage(1);
+                }}
+              >
+                <Text style={[
+                  styles.itemsPerPageButtonText,
+                  itemsPerPage === count && styles.itemsPerPageButtonTextActive
+                ]}>
+                  {count}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </View>
+    );
+  };
 
   const renderMemberCard = ({ item }: { item: ApprovedMember }) => (
     <View style={styles.cardContainer}>
@@ -744,6 +932,15 @@ export default function CartesScreen() {
       {/* Barre de sélection avec boutons de téléchargement */}
       <View style={styles.selectionContainer}>
         <View style={styles.selectionHeader}>
+          <View style={styles.selectionInfo}>
+            <Text style={styles.selectionTitle}>
+              {filteredMembers.length === 1 
+                ? `1 carte disponible`
+                : `${filteredMembers.length} cartes disponibles`
+              }
+            </Text>
+          </View>
+          
           <TouchableOpacity
             style={styles.checkboxContainer}
             onPress={handleSelectAll}
@@ -751,9 +948,9 @@ export default function CartesScreen() {
             <View style={styles.checkboxWrapper}>
               <Ionicons
                 name={
-                  selectedCards.size === getFilteredMembers().length && getFilteredMembers().length > 0
+                  selectedCards.size === filteredMembers.length && filteredMembers.length > 0
                     ? 'checkbox'
-                    : selectedCards.size > 0 && selectedCards.size < getFilteredMembers().length
+                    : selectedCards.size > 0 && selectedCards.size < filteredMembers.length
                     ? 'remove-circle'
                     : 'square-outline'
                 }
@@ -762,9 +959,33 @@ export default function CartesScreen() {
               />
             </View>
             <Text style={styles.selectionLabel}>
-              Sélectionner tout ({selectedCards.size}/{getFilteredMembers().length})
+              Sélectionner tout ({selectedCards.size}/{filteredMembers.length})
             </Text>
           </TouchableOpacity>
+          
+          {filteredMembers.length > itemsPerPage && (
+            <TouchableOpacity
+              style={styles.checkboxContainer}
+              onPress={handleSelectCurrentPage}
+            >
+              <View style={styles.checkboxWrapper}>
+                <Ionicons
+                  name={
+                    isAllCurrentPageSelected()
+                      ? 'checkbox'
+                      : paginationData.paginatedMembers.some(member => selectedCards.has(member.id.toString()))
+                      ? 'remove-circle'
+                      : 'square-outline'
+                  }
+                  size={24}
+                  color="#007AFF"
+                />
+              </View>
+              <Text style={styles.selectionLabel}>
+                Page courante ({paginationData.paginatedMembers.filter(member => selectedCards.has(member.id.toString())).length}/{paginationData.paginatedMembers.length})
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
         
         {selectedCards.size > 0 && (
@@ -813,8 +1034,11 @@ export default function CartesScreen() {
         </View>
       </View>
 
+      {/* Contrôles de pagination */}
+      <PaginationControls />
+
       <FlatList
-        data={filteredMembers}
+        data={paginationData.paginatedMembers}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -921,9 +1145,24 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   selectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
     marginBottom: 16,
+    gap: 12,
+  },
+  selectionInfo: {
+    width: '100%',
+    alignItems: 'center',
+    paddingVertical: 8,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
+  },
+  selectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#495057',
   },
   checkboxContainer: {
     flexDirection: 'row',
@@ -1158,5 +1397,102 @@ const styles = StyleSheet.create({
   modalImage: {
     width: '90%',
     height: '80%',
+  },
+  // Styles de pagination
+  paginationContainer: {
+    backgroundColor: 'white',
+    padding: 16,
+    marginHorizontal: 20,
+    marginBottom: 16,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  paginationInfo: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  paginationText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  cardsCountText: {
+    fontSize: 12,
+    color: '#999',
+    fontWeight: '400',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  paginationControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  paginationButton: {
+    padding: 8,
+    marginHorizontal: 4,
+    borderRadius: 6,
+    backgroundColor: '#F5F5F5',
+    minWidth: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  paginationButtonDisabled: {
+    backgroundColor: '#F0F0F0',
+  },
+  pageIndicator: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#007AFF',
+    borderRadius: 6,
+    marginHorizontal: 8,
+    minWidth: 60,
+    alignItems: 'center',
+  },
+  pageIndicatorText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  itemsPerPageContainer: {
+    alignItems: 'center',
+  },
+  itemsPerPageLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  itemsPerPageButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  itemsPerPageButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: '#F5F5F5',
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+  },
+  itemsPerPageButtonActive: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  itemsPerPageButtonText: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+  },
+  itemsPerPageButtonTextActive: {
+    color: 'white',
   },
 });

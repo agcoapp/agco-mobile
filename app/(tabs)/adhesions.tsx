@@ -35,6 +35,7 @@ interface AdhesionForm {
   date_soumission: string;
   soumis_le?: string;
   raison_rejet?: string;
+  numero_adhesion?: string;
   photos_urls: {
     id_front: string;
     id_back: string;
@@ -356,6 +357,7 @@ export default function AdhesionsScreen() {
       // Générer le PNG de la fiche d'adhésion avec la signature du président (sans numéro d'adhésion)
       setValidationStep(1);
       console.log('🖼️ Génération du PNG de la fiche d\'adhésion...', specificAdhesion?.donnees_snapshot);
+      
       const pngBase64 = await adhesionFormGeneratorRef.current?.generatePNG(
         logoBase64,
         specificAdhesion?.donnees_snapshot.selfie_photo_url, 
@@ -1195,8 +1197,18 @@ export default function AdhesionsScreen() {
             {formatTime(item.soumis_le || item.date_soumission)}
           </Text>
           <Text style={styles.roleText}>
-            Rôle: {item.utilisateur.role}
+            Rôle: {item.utilisateur?.role || 'Membre'}
           </Text>
+          
+          {/* Afficher le numéro d'adhérant pour les adhésions validées */}
+          {item.statut === 'APPROUVE' && (item.numero_adhesion || item.numero_fiche || item.utilisateur?.numero_adhesion) && (
+            <View style={styles.adhesionNumberContainer}>
+              <Ionicons name="card-outline" size={16} color="#007AFF" />
+              <Text style={styles.adhesionNumberText}>
+                N° Adhérant: {item.numero_adhesion || item.numero_fiche || item.utilisateur?.numero_adhesion}
+              </Text>
+            </View>
+          )}
         </View>
         
         {tabValue === 2 && item.raison_rejet && (
@@ -1748,6 +1760,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#8E8E93',
     marginTop: 4,
+  },
+  adhesionNumberContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: '#E3F2FD',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#BBDEFB',
+  },
+  adhesionNumberText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1976D2',
+    marginLeft: 6,
   },
   rejectionReason: {
     marginBottom: 12,
