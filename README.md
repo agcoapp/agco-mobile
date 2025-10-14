@@ -28,11 +28,6 @@ Application mobile cross-platform pour la gestion des membres de l'Association d
 - [Scripts disponibles](#-scripts-disponibles)
 - [Tests](#-tests)
 - [Déploiement](#-déploiement)
-- [Maintenance](#-maintenance)
-- [Dépannage](#-dépannage)
-- [Contribution](#-contribution)
-- [Ressources](#-ressources)
-
 ---
 
 ## 🎯 Aperçu du projet
