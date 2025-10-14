@@ -282,12 +282,6 @@ const API_BASE_URL = "https://sgm-backend-production.up.railway.app";
 Pour modifier l'URL (développement local, staging, production):
 
 ```typescript
-// Développement local
-const API_BASE_URL = "http://localhost:3000";
-
-// Staging
-const API_BASE_URL = "https://sgm-backend-staging.up.railway.app";
-
 // Production
 const API_BASE_URL = "https://sgm-backend-production.up.railway.app";
 ```
