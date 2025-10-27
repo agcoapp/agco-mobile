@@ -5,18 +5,18 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Image,
-    Modal,
-    RefreshControl,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  Modal,
+  RefreshControl,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import ImageViewer from '../../components/ui/ImageViewer';
 import { useAuth } from '../../hooks/useAuth';
@@ -304,11 +304,14 @@ export default function CartesScreen() {
       const totalMembers = selectedMembers.length;
 
       for (const member of selectedMembers) {
+        // Générer un identifiant unique pour ce téléchargement
+        const uniqueId = Date.now() + '_' + Math.random().toString(36).substring(7);
+        
         // Vérifier que les deux images existent
         if (member.carte_membre.recto_url && member.carte_membre.verso_url) {
-          // Télécharger les deux images
-          const rectoFileName = `${member.nom_complet}_recto_temp.png`;
-          const versoFileName = `${member.nom_complet}_verso_temp.png`;
+          // Télécharger les deux images avec des noms de fichiers uniques
+          const rectoFileName = `${member.nom_complet}_${uniqueId}_recto_temp.png`;
+          const versoFileName = `${member.nom_complet}_${uniqueId}_verso_temp.png`;
           const rectoFile = new File(Paths.document, rectoFileName);
           const versoFile = new File(Paths.document, versoFileName);
           
@@ -330,7 +333,7 @@ export default function CartesScreen() {
           setDownloadProgress((downloadedCount / totalMembers) * 100);
         } else if (member.carte_membre.recto_url) {
           // Si seulement recto existe
-          const fileName = `${member.nom_complet}_recto.png`;
+          const fileName = `${member.nom_complet}_${uniqueId}_recto.png`;
           const tempFile = new File(Paths.document, fileName);
           
           const downloadedFile = await File.downloadFileAsync(member.carte_membre.recto_url, tempFile, { idempotent: true });
@@ -341,7 +344,7 @@ export default function CartesScreen() {
           setDownloadProgress((downloadedCount / totalMembers) * 100);
         } else if (member.carte_membre.verso_url) {
           // Si seulement verso existe
-          const fileName = `${member.nom_complet}_verso.png`;
+          const fileName = `${member.nom_complet}_${uniqueId}_verso.png`;
           const tempFile = new File(Paths.document, fileName);
           
           const downloadedFile = await File.downloadFileAsync(member.carte_membre.verso_url, tempFile, { idempotent: true });

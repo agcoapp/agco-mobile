@@ -286,7 +286,7 @@ export default function TabLayout() {
                   {userStatus.utilisateur.numero_adhesion && (
                     <View style={styles.detailRow}>
                       <Ionicons name="card-outline" size={16} color="#666" />
-                      <Text style={styles.detailText}>N° {userStatus.utilisateur.numero_adhesion}</Text>
+                      <Text style={styles.detailText}>{userStatus.utilisateur.numero_adhesion}</Text>
                     </View>
                   )}
 
