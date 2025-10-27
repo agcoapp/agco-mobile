@@ -1,22 +1,22 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as FileSystem from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Image,
-  Modal,
-  RefreshControl,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Image,
+    Modal,
+    RefreshControl,
+    SafeAreaView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import ImageViewer from '../../components/ui/ImageViewer';
 import { useAuth } from '../../hooks/useAuth';
@@ -247,21 +247,22 @@ export default function CartesScreen() {
 
       // Télécharger l'image
       const fileName = `${memberName}_${cardType}.png`;
-      const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+      const tempFile = new File(Paths.document, fileName);
       
-      const downloadResult = await FileSystem.downloadAsync(
+      const downloadedFile = await File.downloadFileAsync(
         imageUrl,
-        fileUri,
+        tempFile,
         {
+          idempotent: true,
           headers: {
             'Accept': 'image/png'
           }
         }
       );
 
-      if (downloadResult.status === 200) {
+      if (downloadedFile) {
         // Sauvegarder dans la galerie
-        const asset = await MediaLibrary.createAssetAsync(fileUri);
+        const asset = await MediaLibrary.createAssetAsync(downloadedFile.uri);
         await MediaLibrary.createAlbumAsync('Cartes Membres', asset, false);
         
         Alert.alert('Succès', `Image ${cardType} de ${memberName} téléchargée`);
@@ -308,21 +309,21 @@ export default function CartesScreen() {
           // Télécharger les deux images
           const rectoFileName = `${member.nom_complet}_recto_temp.png`;
           const versoFileName = `${member.nom_complet}_verso_temp.png`;
-          const rectoUri = `${FileSystem.documentDirectory}${rectoFileName}`;
-          const versoUri = `${FileSystem.documentDirectory}${versoFileName}`;
+          const rectoFile = new File(Paths.document, rectoFileName);
+          const versoFile = new File(Paths.document, versoFileName);
           
           // Télécharger recto
-          await FileSystem.downloadAsync(member.carte_membre.recto_url, rectoUri);
+          const rectoDownloaded = await File.downloadFileAsync(member.carte_membre.recto_url, rectoFile, { idempotent: true });
           
           // Télécharger verso
-          await FileSystem.downloadAsync(member.carte_membre.verso_url, versoUri);
+          const versoDownloaded = await File.downloadFileAsync(member.carte_membre.verso_url, versoFile, { idempotent: true });
           
           // Sauvegarder recto
-          const rectoAsset = await MediaLibrary.createAssetAsync(rectoUri);
+          const rectoAsset = await MediaLibrary.createAssetAsync(rectoDownloaded.uri);
           await MediaLibrary.createAlbumAsync('Cartes Membres', rectoAsset, false);
           
           // Sauvegarder verso
-          const versoAsset = await MediaLibrary.createAssetAsync(versoUri);
+          const versoAsset = await MediaLibrary.createAssetAsync(versoDownloaded.uri);
           await MediaLibrary.createAlbumAsync('Cartes Membres', versoAsset, false);
           
           downloadedCount++;
@@ -330,10 +331,10 @@ export default function CartesScreen() {
         } else if (member.carte_membre.recto_url) {
           // Si seulement recto existe
           const fileName = `${member.nom_complet}_recto.png`;
-          const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+          const tempFile = new File(Paths.document, fileName);
           
-          await FileSystem.downloadAsync(member.carte_membre.recto_url, fileUri);
-          const asset = await MediaLibrary.createAssetAsync(fileUri);
+          const downloadedFile = await File.downloadFileAsync(member.carte_membre.recto_url, tempFile, { idempotent: true });
+          const asset = await MediaLibrary.createAssetAsync(downloadedFile.uri);
           await MediaLibrary.createAlbumAsync('Cartes Membres', asset, false);
           
           downloadedCount++;
@@ -341,10 +342,10 @@ export default function CartesScreen() {
         } else if (member.carte_membre.verso_url) {
           // Si seulement verso existe
           const fileName = `${member.nom_complet}_verso.png`;
-          const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+          const tempFile = new File(Paths.document, fileName);
           
-          await FileSystem.downloadAsync(member.carte_membre.verso_url, fileUri);
-          const asset = await MediaLibrary.createAssetAsync(fileUri);
+          const downloadedFile = await File.downloadFileAsync(member.carte_membre.verso_url, tempFile, { idempotent: true });
+          const asset = await MediaLibrary.createAssetAsync(downloadedFile.uri);
           await MediaLibrary.createAlbumAsync('Cartes Membres', asset, false);
           
           downloadedCount++;
@@ -384,14 +385,15 @@ export default function CartesScreen() {
       // Télécharger les deux images
       const rectoFileName = `${member.nom_complet}_recto_temp.png`;
       const versoFileName = `${member.nom_complet}_verso_temp.png`;
-      const rectoUri = `${FileSystem.documentDirectory}${rectoFileName}`;
-      const versoUri = `${FileSystem.documentDirectory}${versoFileName}`;
+      const rectoFile = new File(Paths.document, rectoFileName);
+      const versoFile = new File(Paths.document, versoFileName);
       
       // Télécharger recto
-      const rectoResult = await FileSystem.downloadAsync(
+      const rectoDownloaded = await File.downloadFileAsync(
         member.carte_membre.recto_url,
-        rectoUri,
+        rectoFile,
         {
+          idempotent: true,
           headers: {
             'Accept': 'image/png'
           }
@@ -399,27 +401,28 @@ export default function CartesScreen() {
       );
 
       // Télécharger verso
-      const versoResult = await FileSystem.downloadAsync(
+      const versoDownloaded = await File.downloadFileAsync(
         member.carte_membre.verso_url,
-        versoUri,
+        versoFile,
         {
+          idempotent: true,
           headers: {
             'Accept': 'image/png'
           }
         }
       );
 
-      if (rectoResult.status === 200 && versoResult.status === 200) {
+      if (rectoDownloaded && versoDownloaded) {
         // Créer une image combinée (pour l'instant, on va sauvegarder les deux séparément)
         // Dans une vraie implémentation, on utiliserait une bibliothèque comme react-native-image-manipulator
         // pour combiner les images côte à côte
         
         // Sauvegarder recto
-        const rectoAsset = await MediaLibrary.createAssetAsync(rectoUri);
+        const rectoAsset = await MediaLibrary.createAssetAsync(rectoDownloaded.uri);
         await MediaLibrary.createAlbumAsync('Cartes Membres', rectoAsset, false);
         
         // Sauvegarder verso
-        const versoAsset = await MediaLibrary.createAssetAsync(versoUri);
+        const versoAsset = await MediaLibrary.createAssetAsync(versoDownloaded.uri);
         await MediaLibrary.createAlbumAsync('Cartes Membres', versoAsset, false);
         
         Alert.alert('Succès', `Carte complète de ${member.nom_complet} téléchargée (recto + verso)`);

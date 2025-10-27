@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import React, { forwardRef, useImperativeHandle, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import ViewShot from 'react-native-view-shot';
@@ -13,16 +13,16 @@ const generateQRCode = async (url: string): Promise<string> => {
     // Utiliser l'API QR Server pour générer le QR code
     const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(url)}`;  
     
+    // Créer un fichier temporaire dans le répertoire documents
+    const tempFile = new File(Paths.document, 'temp_qr_code.png');
+    
     // Télécharger l'image QR code générée
-    const downloadResult = await FileSystem.downloadAsync(
-      qrApiUrl,
-      FileSystem.documentDirectory + 'temp_qr_code.png'
-    );
+    const downloadedFile = await File.downloadFileAsync(qrApiUrl, tempFile, {
+      idempotent: true, // Permet d'écraser si le fichier existe déjà
+    });
     
     // Lire l'image téléchargée en base64
-    const base64 = await FileSystem.readAsStringAsync(downloadResult.uri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
+    const base64 = downloadedFile.base64Sync();
     
     console.log('✅ QR code généré avec succès');
     return `data:image/png;base64,${base64}`;

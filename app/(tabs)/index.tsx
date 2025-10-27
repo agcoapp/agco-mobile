@@ -1,23 +1,23 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as FileSystem from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import * as Print from 'expo-print';
 import { router } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  Image,
-  Modal,
-  RefreshControl,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    Image,
+    Modal,
+    RefreshControl,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import ImageViewer from '../../components/ui/ImageViewer';
 import { useAuth } from '../../hooks/useAuth';
@@ -274,14 +274,15 @@ export default function DashboardScreen() {
       // Télécharger les deux images
       const rectoFileName = `${member.nom_complet}_recto_temp.png`;
       const versoFileName = `${member.nom_complet}_verso_temp.png`;
-      const rectoUri = `${FileSystem.documentDirectory}${rectoFileName}`;
-      const versoUri = `${FileSystem.documentDirectory}${versoFileName}`;
+      const rectoFile = new File(Paths.document, rectoFileName);
+      const versoFile = new File(Paths.document, versoFileName);
       
       // Télécharger recto
-      const rectoResult = await FileSystem.downloadAsync(
+      const rectoDownloaded = await File.downloadFileAsync(
         member.carte_membre.recto_url,
-        rectoUri,
+        rectoFile,
         {
+          idempotent: true,
           headers: {
             'Accept': 'image/png'
           }
@@ -289,23 +290,24 @@ export default function DashboardScreen() {
       );
 
       // Télécharger verso
-      const versoResult = await FileSystem.downloadAsync(
+      const versoDownloaded = await File.downloadFileAsync(
         member.carte_membre.verso_url,
-        versoUri,
+        versoFile,
         {
+          idempotent: true,
           headers: {
             'Accept': 'image/png'
           }
         }
       );
 
-      if (rectoResult.status === 200 && versoResult.status === 200) {
+      if (rectoDownloaded && versoDownloaded) {
         // Sauvegarder recto
-        const rectoAsset = await MediaLibrary.createAssetAsync(rectoUri);
+        const rectoAsset = await MediaLibrary.createAssetAsync(rectoDownloaded.uri);
         await MediaLibrary.createAlbumAsync('Cartes Membres', rectoAsset, false);
         
         // Sauvegarder verso
-        const versoAsset = await MediaLibrary.createAssetAsync(versoUri);
+        const versoAsset = await MediaLibrary.createAssetAsync(versoDownloaded.uri);
         await MediaLibrary.createAlbumAsync('Cartes Membres', versoAsset, false);
         
         Alert.alert('Succès', `Carte complète de ${member.nom_complet} téléchargée (recto + verso)`);

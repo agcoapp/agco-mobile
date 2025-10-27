@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as FileSystem from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import * as Print from 'expo-print';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -19,7 +19,7 @@ import {
 } from 'react-native';
 import ImageViewer from '../../components/ui/ImageViewer';
 import { apiService } from '../../services/apiService';
-import { cleanCodeFormulaire } from '../../utils/fonctions';
+import { normalizeMemberData } from '../../utils/fonctions';
 
 const { width } = Dimensions.get('window');
 
@@ -45,9 +45,32 @@ interface Member {
   code_formulaire: string;
   numero_adhesion?: string;
   telephone?: string;
+  email?: string;
+  nom_utilisateur?: string;
+  role?: string;
   statut: 'EN_ATTENTE' | 'APPROUVE' | 'REJETE';
-  soumis_le: string;
-  formulaire_actuel: {
+  soumis_le?: string;
+  type?: string;
+  donnees_snapshot?: {
+    nom: string;
+    prenoms: string;
+    profession: string;
+    date_naissance: string;
+    telephone: string;
+    selfie_photo_url?: string;
+    lieu_naissance?: string;
+    adresse?: string;
+    ville_residence?: string;
+    numero_carte_consulaire?: string;
+    date_emission_piece?: string;
+    date_entree_congo?: string;
+    employeur_ecole?: string;
+    nom_conjoint?: string;
+    prenom_conjoint?: string;
+    nombre_enfants?: string | number;
+    commentaire?: string;
+  };
+  formulaire_actuel?: {
     donnees_snapshot: {
       nom: string;
       prenoms: string;
@@ -64,9 +87,19 @@ interface Member {
       employeur_ecole?: string;
       nom_conjoint?: string;
       prenom_conjoint?: string;
-      nombre_enfants?: string;
+      nombre_enfants?: string | number;
       commentaire?: string;
     };
+  };
+  utilisateur?: {
+    nom_utilisateur?: string;
+    email?: string;
+    role?: string;
+    numero_adhesion?: string;
+    telephone?: string;
+    selfie_photo_url?: string;
+    photo_profil_url?: string;
+    signature_url?: string;
   };
 }
 
@@ -263,14 +296,15 @@ export default function CarteMembreScreen() {
       // Télécharger les deux images
       const rectoFileName = `${member.nom_complet}_recto_temp.png`;
       const versoFileName = `${member.nom_complet}_verso_temp.png`;
-      const rectoUri = `${FileSystem.documentDirectory}${rectoFileName}`;
-      const versoUri = `${FileSystem.documentDirectory}${versoFileName}`;
+      const rectoFile = new File(Paths.document, rectoFileName);
+      const versoFile = new File(Paths.document, versoFileName);
       
       // Télécharger recto
-      const rectoResult = await FileSystem.downloadAsync(
+      const rectoResult = await File.downloadFileAsync(
         member.carte_membre.recto_url,
-        rectoUri,
+        rectoFile,
         {
+          idempotent: true,
           headers: {
             'Accept': 'image/png'
           }
@@ -278,23 +312,24 @@ export default function CarteMembreScreen() {
       );
 
       // Télécharger verso
-      const versoResult = await FileSystem.downloadAsync(
+      const versoResult = await File.downloadFileAsync(
         member.carte_membre.verso_url,
-        versoUri,
+        versoFile,
         {
+          idempotent: true,
           headers: {
             'Accept': 'image/png'
           }
         }
       );
 
-      if (rectoResult.status === 200 && versoResult.status === 200) {
+      if (rectoResult && versoResult) {
         // Sauvegarder recto
-        const rectoAsset = await MediaLibrary.createAssetAsync(rectoUri);
+        const rectoAsset = await MediaLibrary.createAssetAsync(rectoResult.uri);
         await MediaLibrary.createAlbumAsync('Cartes Membres', rectoAsset, false);
         
         // Sauvegarder verso
-        const versoAsset = await MediaLibrary.createAssetAsync(versoUri);
+        const versoAsset = await MediaLibrary.createAssetAsync(versoResult.uri);
         await MediaLibrary.createAlbumAsync('Cartes Membres', versoAsset, false);
         
         Alert.alert('Succès', `Carte complète de ${member.nom_complet} téléchargée (recto + verso)`);
@@ -537,24 +572,33 @@ export default function CarteMembreScreen() {
         <View style={styles.memberInfoCard}>
           <Text style={styles.memberInfoTitle}>Informations du membre</Text>
           <View style={styles.memberInfoContent}>
-            <Text style={styles.memberInfoText}>
-              • <Text style={styles.memberInfoLabel}>Numéro d'adhésion:</Text> {cleanCodeFormulaire(member.code_formulaire)}
-            </Text>
-            <Text style={styles.memberInfoText}>
-              • <Text style={styles.memberInfoLabel}>Nom:</Text> {member.formulaire_actuel?.donnees_snapshot?.nom || 'Non renseigné'}
-            </Text>
-            <Text style={styles.memberInfoText}>
-              • <Text style={styles.memberInfoLabel}>Prénom:</Text> {member.formulaire_actuel?.donnees_snapshot?.prenoms || 'Non renseigné'}
-            </Text>
-            <Text style={styles.memberInfoText}>
-              • <Text style={styles.memberInfoLabel}>Profession:</Text> {member.formulaire_actuel?.donnees_snapshot?.profession || 'Non renseigné'}
-            </Text>
-            <Text style={styles.memberInfoText}>
-              • <Text style={styles.memberInfoLabel}>Date de naissance:</Text> {member.formulaire_actuel?.donnees_snapshot?.date_naissance || 'Non renseigné'}
-            </Text>
-            <Text style={styles.memberInfoText}>
-              • <Text style={styles.memberInfoLabel}>Téléphone:</Text> {member.formulaire_actuel?.donnees_snapshot?.telephone || 'Non renseigné'}
-            </Text>
+            {(() => {
+              const normalizedData = normalizeMemberData(member);
+              const { donneesSnapshot } = normalizedData;
+              
+              return (
+                <>
+                  <Text style={styles.memberInfoText}>
+                    • <Text style={styles.memberInfoLabel}>Numéro d'adhésion:</Text> {normalizedData.numeroAdhesion || 'Non renseigné'}
+                  </Text>
+                  <Text style={styles.memberInfoText}>
+                    • <Text style={styles.memberInfoLabel}>Nom:</Text> {donneesSnapshot.nom || 'Non renseigné'}
+                  </Text>
+                  <Text style={styles.memberInfoText}>
+                    • <Text style={styles.memberInfoLabel}>Prénom:</Text> {donneesSnapshot.prenoms || 'Non renseigné'}
+                  </Text>
+                  <Text style={styles.memberInfoText}>
+                    • <Text style={styles.memberInfoLabel}>Profession:</Text> {donneesSnapshot.profession || 'Non renseigné'}
+                  </Text>
+                  <Text style={styles.memberInfoText}>
+                    • <Text style={styles.memberInfoLabel}>Date de naissance:</Text> {donneesSnapshot.date_naissance || 'Non renseigné'}
+                  </Text>
+                  <Text style={styles.memberInfoText}>
+                    • <Text style={styles.memberInfoLabel}>Téléphone:</Text> {donneesSnapshot.telephone || 'Non renseigné'}
+                  </Text>
+                </>
+              );
+            })()}
             
             {!showAllInfo && (
               <TouchableOpacity
@@ -565,47 +609,116 @@ export default function CarteMembreScreen() {
               </TouchableOpacity>
             )}
 
-            {showAllInfo && (
+            {showAllInfo && (() => {
+              // Utiliser normalizeMemberData pour obtenir les données unifiées
+              const normalizedData = normalizeMemberData(member);
+              const { donneesSnapshot } = normalizedData;
+              
+              // Debug: Log the normalized data
+              console.log("🔍 Member raw data:", JSON.stringify(member, null, 2));
+              console.log("🔍 Normalized data:", JSON.stringify(normalizedData, null, 2));
+              console.log("🔍 donneesSnapshot:", JSON.stringify(donneesSnapshot, null, 2));
+              
+              // Fonction helper pour formater les dates au format DD/MM/YYYY
+              const formatDate = (dateString: string): string => {
+                if (!dateString) return '';
+                try {
+                  // Si c'est déjà au format DD/MM/YYYY, retourner tel quel
+                  if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) {
+                    return dateString;
+                  }
+                  // Si c'est au format DD-MM-YYYY, convertir
+                  if (/^\d{2}-\d{2}-\d{4}$/.test(dateString)) {
+                    return dateString.replace(/-/g, '/');
+                  }
+                  // Si c'est au format ISO (YYYY-MM-DD), convertir
+                  if (/^\d{4}-\d{2}-\d{2}/.test(dateString)) {
+                    const date = new Date(dateString);
+                    const day = date.getDate().toString().padStart(2, '0');
+                    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                    const year = date.getFullYear();
+                    return `${day}/${month}/${year}`;
+                  }
+                  return dateString;
+                } catch (error) {
+                  return dateString;
+                }
+              };
+
+              // Fonction helper pour obtenir le rôle d'affichage
+              const getDisplayRole = () => {
+                const role = member?.type === "ADMIN_PERSONNEL" ? member?.utilisateur?.role : member?.role;
+                switch (role) {
+                  case 'SECRETAIRE_GENERALE': return 'Secrétaire Générale';
+                  case 'PRESIDENT': return 'Président';
+                  case 'MEMBRE': return 'Membre';
+                  default: return 'Membre';
+                }
+              };
+
+              // Déterminer l'email et le nom d'utilisateur selon le type
+              const email = member?.type === "ADMIN_PERSONNEL" 
+                ? member?.utilisateur?.email || member?.email || '' 
+                : member?.email || '';
+              const nomUtilisateur = member?.type === "ADMIN_PERSONNEL" 
+                ? member?.utilisateur?.nom_utilisateur || member?.nom_utilisateur || '' 
+                : member?.nom_utilisateur || '';
+
+              return (
               <>
                 <Text style={styles.memberInfoText}>
-                  • <Text style={styles.memberInfoLabel}>Lieu de naissance:</Text> {member.formulaire_actuel?.donnees_snapshot?.lieu_naissance || 'Non renseigné'}
+                  • <Text style={styles.memberInfoLabel}>Lieu de naissance:</Text> {donneesSnapshot.lieu_naissance || 'Non renseigné'}
                 </Text>
                 <Text style={styles.memberInfoText}>
-                  • <Text style={styles.memberInfoLabel}>Adresse:</Text> {member.formulaire_actuel?.donnees_snapshot?.adresse || 'Non renseigné'}
+                  • <Text style={styles.memberInfoLabel}>Adresse:</Text> {donneesSnapshot.adresse || 'Non renseigné'}
+                </Text>
+                {email ? (
+                  <Text style={styles.memberInfoText}>
+                    • <Text style={styles.memberInfoLabel}>Email:</Text> {email}
+                  </Text>
+                ) : null}
+                {nomUtilisateur ? (
+                  <Text style={styles.memberInfoText}>
+                    • <Text style={styles.memberInfoLabel}>Nom d&apos;utilisateur:</Text> {nomUtilisateur}
+                  </Text>
+                ) : null}
+                <Text style={styles.memberInfoText}>
+                  • <Text style={styles.memberInfoLabel}>Rôle:</Text> {getDisplayRole()}
                 </Text>
                 <Text style={styles.memberInfoText}>
-                  • <Text style={styles.memberInfoLabel}>Ville de résidence:</Text> {member.formulaire_actuel?.donnees_snapshot?.ville_residence || 'Non renseigné'}
+                  • <Text style={styles.memberInfoLabel}>Numéro de carte d&apos;identité consulaire:</Text> {donneesSnapshot.numero_carte_consulaire || 'Non renseigné'}
                 </Text>
                 <Text style={styles.memberInfoText}>
-                  • <Text style={styles.memberInfoLabel}>Numéro de pièce d'identité:</Text> {member.formulaire_actuel?.donnees_snapshot?.numero_carte_consulaire || 'Non renseigné'}
+                  • <Text style={styles.memberInfoLabel}>Date de délivrance de la carte:</Text> {formatDate(donneesSnapshot.date_emission_piece) || 'Non renseigné'}
                 </Text>
                 <Text style={styles.memberInfoText}>
-                  • <Text style={styles.memberInfoLabel}>Date de délivrance:</Text> {member.formulaire_actuel?.donnees_snapshot?.date_emission_piece || 'Non renseigné'}
+                  • <Text style={styles.memberInfoLabel}>Date d&apos;entrée au Congo:</Text> {formatDate(donneesSnapshot.date_entree_congo) || 'Non renseigné'}
                 </Text>
                 <Text style={styles.memberInfoText}>
-                  • <Text style={styles.memberInfoLabel}>Date d'entrée au Congo:</Text> {member.formulaire_actuel?.donnees_snapshot?.date_entree_congo || 'Non renseigné'}
+                  • <Text style={styles.memberInfoLabel}>Employeur:</Text> {donneesSnapshot.employeur_ecole || 'Non renseigné'}
                 </Text>
                 <Text style={styles.memberInfoText}>
-                  • <Text style={styles.memberInfoLabel}>Employeur/École:</Text> {member.formulaire_actuel?.donnees_snapshot?.employeur_ecole || 'Non renseigné'}
+                  • <Text style={styles.memberInfoLabel}>Nom du conjoint:</Text> {donneesSnapshot.nom_conjoint || 'Non renseigné'}
                 </Text>
                 <Text style={styles.memberInfoText}>
-                  • <Text style={styles.memberInfoLabel}>Nom du conjoint:</Text> {member.formulaire_actuel?.donnees_snapshot?.nom_conjoint || 'Non renseigné'}
+                  • <Text style={styles.memberInfoLabel}>Prénom du conjoint:</Text> {donneesSnapshot.prenom_conjoint || 'Non renseigné'}
                 </Text>
                 <Text style={styles.memberInfoText}>
-                  • <Text style={styles.memberInfoLabel}>Prénom du conjoint:</Text> {member.formulaire_actuel?.donnees_snapshot?.prenom_conjoint || 'Non renseigné'}
-                </Text>
-                <Text style={styles.memberInfoText}>
-                  • <Text style={styles.memberInfoLabel}>Nombre d'enfants:</Text> {member.formulaire_actuel?.donnees_snapshot?.nombre_enfants || 'Non renseigné'}
+                  • <Text style={styles.memberInfoLabel}>Nombre d&apos;enfants:</Text> {donneesSnapshot.nombre_enfants || 0}
                 </Text>
                 <Text style={styles.memberInfoText}>
                   • <Text style={styles.memberInfoLabel}>Statut:</Text> {member.statut === 'APPROUVE' ? 'Approuvé' : member.statut === 'EN_ATTENTE' ? 'En attente' : 'Rejeté'}
                 </Text>
-                <Text style={styles.memberInfoText}>
-                  • <Text style={styles.memberInfoLabel}>Date de soumission:</Text> {new Date(member.soumis_le).toLocaleDateString('fr-FR')}
-                </Text>
-                <Text style={styles.memberInfoText}>
-                  • <Text style={styles.memberInfoLabel}>Commentaire:</Text> {member.formulaire_actuel?.donnees_snapshot?.commentaire || 'Aucun commentaire'}
-                </Text>
+                {member.soumis_le ? (
+                  <Text style={styles.memberInfoText}>
+                    • <Text style={styles.memberInfoLabel}>Date de soumission:</Text> {new Date(member.soumis_le).toLocaleDateString('fr-FR')}
+                  </Text>
+                ) : null}
+                {donneesSnapshot.commentaire ? (
+                  <Text style={styles.memberInfoText}>
+                    • <Text style={styles.memberInfoLabel}>Commentaire:</Text> {donneesSnapshot.commentaire}
+                  </Text>
+                ) : null}
 
                 <TouchableOpacity
                   style={styles.showMoreButton}
@@ -614,7 +727,8 @@ export default function CarteMembreScreen() {
                   <Text style={styles.showMoreButtonText}>Voir moins</Text>
                 </TouchableOpacity>
               </>
-            )}
+              );
+            })()}
           </View>
         </View>
       </ScrollView>
@@ -872,3 +986,4 @@ const styles = StyleSheet.create({
     height: '80%',
   },
 });
+

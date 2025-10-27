@@ -3,7 +3,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosError, AxiosInstance } from 'axios';
 
-const API_BASE_URL = "https://sgm-backend-production.up.railway.app";
+const API_BASE_URL = "https://sgm-backend.zeabur.app";
 
 export interface User {
   id: number;

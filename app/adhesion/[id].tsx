@@ -1,20 +1,20 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as FileSystem from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  Modal,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Image,
+    Modal,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import ImageViewer from '../../components/ui/ImageViewer';
 import { useAuth } from '../../hooks/useAuth';
@@ -183,17 +183,18 @@ export default function AdhesionDetailsScreen() {
 
       // Créer un nom de fichier unique
       const fileName = `fiche_adhesion_${adhesion?.nom_complet || 'membre'}_${Date.now()}.png`;
-      const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+      const tempFile = new File(Paths.document, fileName);
 
       // Télécharger l'image
-      const downloadResult = await FileSystem.downloadAsync(
+      const downloadedFile = await File.downloadFileAsync(
         adhesion!.formulaireImage,
-        fileUri
+        tempFile,
+        { idempotent: true }
       );
 
-      if (downloadResult.status === 200) {
+      if (downloadedFile) {
         // Sauvegarder dans la galerie
-        const asset = await MediaLibrary.createAssetAsync(fileUri);
+        const asset = await MediaLibrary.createAssetAsync(downloadedFile.uri);
         await MediaLibrary.createAlbumAsync('SGM', asset, false);
         
         Alert.alert(
@@ -218,21 +219,22 @@ export default function AdhesionDetailsScreen() {
     try {
       // Créer un nom de fichier unique
       const fileName = `fiche_adhesion_${adhesion?.nom_complet || 'membre'}_${Date.now()}.pdf`;
-      const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+      const tempFile = new File(Paths.document, fileName);
 
       // Télécharger l'image (nous la traitons comme un PDF)
-      const downloadResult = await FileSystem.downloadAsync(
+      const downloadedFile = await File.downloadFileAsync(
         adhesion!.formulaireImage,
-        fileUri
+        tempFile,
+        { idempotent: true }
       );
 
-      if (downloadResult.status === 200) {
+      if (downloadedFile) {
         // Vérifier si le partage est disponible
         const isAvailable = await Sharing.isAvailableAsync();
         
         if (isAvailable) {
           // Partager le fichier
-          await Sharing.shareAsync(fileUri, {
+          await Sharing.shareAsync(downloadedFile.uri, {
             mimeType: 'application/pdf',
             dialogTitle: 'Fiche d\'adhésion'
           });
